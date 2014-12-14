@@ -145,14 +145,19 @@ public class HBUtils {
 		Cell cell = columnFamily.getColumn(HBUtils.cellname(HBConsts.VERSON_NO));
 		if (cell instanceof BufferCell) {
 			BufferCell bufferCell = (BufferCell) cell;
-			long timestamp = bufferCell.timestamp();
-			long versionNo = bufferCell.value().getLong();
-			version = new Version(versionNo, timestamp);
+			try {
+				long timestamp = bufferCell.timestamp();
+				long versionNo = bufferCell.value().getLong();
+				version = new Version(versionNo, timestamp);
+			} catch (Exception e) {
+				logger.error("getMutationVersion exception {} ", e);
+			}	
 		}
 		return version;
 	}
 
 	private static Set<KeyMetaData> getLocalPrimaryKeys(String inKSName, String inCFName, String inPrimaryKeyName) {
+		String localDcName = DatabaseDescriptor.getLocalDataCenter();
 		Set<KeyMetaData> localKeys = new HashSet<KeyMetaData>();
 		if (inPrimaryKeyName != null && !inPrimaryKeyName.isEmpty()) {
 			try {
@@ -167,7 +172,10 @@ public class HBUtils {
 				UntypedResultSet result = QueryProcessor.process(sb.toString(), ConsistencyLevel.LOCAL_ONE);
 				for (Row row : result) {
 					ByteBuffer key = row.getBytes(inPrimaryKeyName);
-					localKeys.add(new KeyMetaData(inKSName, inCFName, key));
+					String dcName = row.getString(HBConsts.VERSON_NO);
+					if(localDcName.equals(dcName)) {
+						localKeys.add(new KeyMetaData(inKSName, inCFName, key));	
+					}
 				}
 			} catch (RequestExecutionException e) {
 				logger.debug("getKeyValue", e);

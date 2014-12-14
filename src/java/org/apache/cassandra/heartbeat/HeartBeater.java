@@ -162,7 +162,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 				long ts = System.currentTimeMillis();
 				if (localDCName.equalsIgnoreCase(source)) {
 					versionNo = value.getLong(HBConsts.VERSON_NO);
-					ts = value.getLong(HBConsts.VERSION_WRITE_TIME) / 1000;
+					ts = value.getTimestamp(HBConsts.VERSON_NO).getTime() / 1000;
 				}
 				updateStatusMsgMap(inKSName, inCFName, partitionKey, ts, versionNo);
 			} catch (Exception e) {

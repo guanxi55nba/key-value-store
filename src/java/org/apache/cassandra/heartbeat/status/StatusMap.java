@@ -87,7 +87,7 @@ public class StatusMap {
 				}
 				// Update removed status
 				Status removedStatus = m_removedEntries.get(key, inDcName);
-				if (removedStatus == null) {
+				if (removedStatus == null && currentStatus!=null) {
 					removedStatus = new Status(currentStatus.getUpdateTs(),
 							removedEntry);
 					m_removedEntries.put(key, inDcName, removedStatus);

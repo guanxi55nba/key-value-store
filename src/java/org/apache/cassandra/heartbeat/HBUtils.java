@@ -163,7 +163,7 @@ public class HBUtils {
 			try {
 				StringBuilder sb = new StringBuilder();
 				sb.append("select ");
-				sb.append(inPrimaryKeyName);
+				sb.append(inPrimaryKeyName + ", " + HBConsts.SOURCE);
 				sb.append(" from ");
 				sb.append(inKSName);
 				sb.append(".");
@@ -173,7 +173,7 @@ public class HBUtils {
 				for (Row row : result) {
 					ByteBuffer key = row.getBytes(inPrimaryKeyName);
 					String dcName = row.getString(HBConsts.SOURCE);
-					if(localDcName.equals(dcName)) {
+					if(localDcName.equalsIgnoreCase(dcName)) {
 						localKeys.add(new KeyMetaData(inKSName, inCFName, key));	
 					}
 				}

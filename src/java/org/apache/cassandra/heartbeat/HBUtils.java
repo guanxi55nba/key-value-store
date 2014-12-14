@@ -172,7 +172,7 @@ public class HBUtils {
 				UntypedResultSet result = QueryProcessor.process(sb.toString(), ConsistencyLevel.LOCAL_ONE);
 				for (Row row : result) {
 					ByteBuffer key = row.getBytes(inPrimaryKeyName);
-					String dcName = row.getString(HBConsts.VERSON_NO);
+					String dcName = row.getString(HBConsts.SOURCE);
 					if(localDcName.equals(dcName)) {
 						localKeys.add(new KeyMetaData(inKSName, inCFName, key));	
 					}

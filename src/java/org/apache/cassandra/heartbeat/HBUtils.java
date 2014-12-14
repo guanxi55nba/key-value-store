@@ -111,7 +111,8 @@ public class HBUtils {
 	 */
 	public static Set<KeyMetaData> getLocalSavedPartitionKeys() {
 		Set<KeyMetaData> localKeys = new HashSet<KeyMetaData>();
-		for (String ksName : getAllLocalKeySpaceName()) {
+		Set<String> ksNames = getAllLocalKeySpaceName();
+		for (String ksName : ksNames) {
 			Set<ColumnFamilyStore> columnFamilyStores = getColumnFamilyStores(ksName);
 			for (ColumnFamilyStore store : columnFamilyStores) {
 				String cfName = store.getColumnFamilyName();
@@ -127,6 +128,7 @@ public class HBUtils {
 		}
 		return localKeys;
 	}
+
 
 	public static Set<String> getDataCenterNames(String inKeySpaces) {
 		Set<String> datacenterNames = new HashSet<String>();
@@ -151,19 +153,18 @@ public class HBUtils {
 				version = new Version(versionNo, timestamp);
 			} catch (Exception e) {
 				logger.error("getMutationVersion exception {} ", e);
-			}	
+			}
 		}
 		return version;
 	}
 
 	private static Set<KeyMetaData> getLocalPrimaryKeys(String inKSName, String inCFName, String inPrimaryKeyName) {
-		String localDcName = DatabaseDescriptor.getLocalDataCenter();
 		Set<KeyMetaData> localKeys = new HashSet<KeyMetaData>();
 		if (inPrimaryKeyName != null && !inPrimaryKeyName.isEmpty()) {
 			try {
 				StringBuilder sb = new StringBuilder();
 				sb.append("select ");
-				sb.append(inPrimaryKeyName + ", " + HBConsts.SOURCE);
+				sb.append(inPrimaryKeyName);
 				sb.append(" from ");
 				sb.append(inKSName);
 				sb.append(".");
@@ -172,10 +173,7 @@ public class HBUtils {
 				UntypedResultSet result = QueryProcessor.process(sb.toString(), ConsistencyLevel.LOCAL_ONE);
 				for (Row row : result) {
 					ByteBuffer key = row.getBytes(inPrimaryKeyName);
-					String dcName = row.getString(HBConsts.SOURCE);
-					if(localDcName.equalsIgnoreCase(dcName)) {
-						localKeys.add(new KeyMetaData(inKSName, inCFName, key));	
-					}
+					localKeys.add(new KeyMetaData(inKSName, inCFName, key, row));
 				}
 			} catch (RequestExecutionException e) {
 				logger.debug("getKeyValue", e);
@@ -218,16 +216,16 @@ public class HBUtils {
 		}
 		return primaryKeyName;
 	}
-	
+
 	public static String byteBufferToString(String inKSName, String inCFName, ByteBuffer inKey) {
 		CFMetaData cfMetaData = Schema.instance.getKSMetaData(inKSName).cfMetaData().get(inCFName);
 		return byteBufferToString(cfMetaData, inKey);
 	}
-	
+
 	public static String byteBufferToString(CFMetaData cfMetaData, ByteBuffer inKey) {
 		return cfMetaData.getKeyValidator().getString(inKey);
 	}
-	
+
 	public static ByteBuffer stringToByteBuffer(String inKSName, String inCFName, String inKey) {
 		CFMetaData cfMetaData = Schema.instance.getKSMetaData(inKSName).cfMetaData().get(inCFName);
 		return stringToByteBuffer(cfMetaData, inKey);
@@ -236,29 +234,27 @@ public class HBUtils {
 	public static ByteBuffer stringToByteBuffer(CFMetaData cfMetaData, String inKey) {
 		return cfMetaData.getKeyValidator().fromString(inKey);
 	}
-	
-	public static Set<String> getReadCommandRelatedKeySpaceNames(Pageable inPageable){
+
+	public static Set<String> getReadCommandRelatedKeySpaceNames(Pageable inPageable) {
 		Set<String> ksNames = new HashSet<String>();
-		if(inPageable instanceof ReadCommands)
+		if (inPageable instanceof ReadCommands)
 			for (ReadCommand cmd : ((ReadCommands) inPageable).commands) {
 				ksNames.add(cmd.getKeyspace());
 			}
 		return ksNames;
 	}
-	
-	public static CellName cellname(ByteBuffer... bbs)
-    {
-        if (bbs.length == 1)
-            return CellNames.simpleDense(bbs[0]);
-        else
-            return CellNames.compositeDense(bbs);
-    }
-	
-	public static CellName cellname(String... strs)
-    {
-        ByteBuffer[] bbs = new ByteBuffer[strs.length];
-        for (int i = 0; i < strs.length; i++)
-            bbs[i] = ByteBufferUtil.bytes(strs[i]);
-        return cellname(bbs);
-    }
+
+	public static CellName cellname(ByteBuffer... bbs) {
+		if (bbs.length == 1)
+			return CellNames.simpleDense(bbs[0]);
+		else
+			return CellNames.compositeDense(bbs);
+	}
+
+	public static CellName cellname(String... strs) {
+		ByteBuffer[] bbs = new ByteBuffer[strs.length];
+		for (int i = 0; i < strs.length; i++)
+			bbs[i] = ByteBufferUtil.bytes(strs[i]);
+		return cellname(bbs);
+	}
 }

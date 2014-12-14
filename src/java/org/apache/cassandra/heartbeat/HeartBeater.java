@@ -44,8 +44,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterMBean {
 	private static final Logger logger = LoggerFactory.getLogger(HeartBeater.class);
 	private static final String MBEAN_NAME = "org.apache.cassandra.net:type=HeartBeater";
-	private static final DebuggableScheduledThreadPoolExecutor executor = new DebuggableScheduledThreadPoolExecutor(
-			"HeartBeatTasks");
+	private static final DebuggableScheduledThreadPoolExecutor executor = new DebuggableScheduledThreadPoolExecutor("HeartBeatTasks");
 	public final static int intervalInMillis = ConfReader.instance.getHeartbeatInterval();
 	private final Comparator<InetAddress> inetcomparator = new Comparator<InetAddress>() {
 		public int compare(InetAddress addr1, InetAddress addr2) {
@@ -62,9 +61,13 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	private ScheduledFuture<?> scheduledHeartBeatTask;
 	private AtomicInteger version = new AtomicInteger(0);
 	public static final HeartBeater instance = new HeartBeater();
+	private String localDCName = DatabaseDescriptor.getLocalDataCenter();
 
 	private HeartBeater() {
-		/* register with the Failure Detector for receiving Failure detector events */
+		/*
+		 * register with the Failure Detector for receiving Failure detector
+		 * events
+		 */
 		FailureDetector.instance.registerFailureDetectionEventListener(this);
 
 		// Register this instance with JMX
@@ -95,8 +98,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 					StatusSynMsg statusSynMsg = entry.getValue();
 
 					statusSynMsg.updateTimestamp(sendTime);
-					MessageOut<StatusSynMsg> finalMsg = new MessageOut<StatusSynMsg>(
-							MessagingService.Verb.HEARTBEAT_DIGEST, statusSynMsg, StatusSynMsg.serializer);
+					MessageOut<StatusSynMsg> finalMsg = new MessageOut<StatusSynMsg>(MessagingService.Verb.HEARTBEAT_DIGEST, statusSynMsg, StatusSynMsg.serializer);
 					MessagingService.instance().sendOneWay(finalMsg, destination);
 					logger.info("send out status msg to {} with msg {}", destination, statusSynMsg);
 				}
@@ -112,8 +114,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 
 		logger.info("Schedule task to send out heartbeat if needed");
 
-		scheduledHeartBeatTask = executor.scheduleWithFixedDelay(new HeartBeatTask(), HeartBeater.intervalInMillis,
-				HeartBeater.intervalInMillis, TimeUnit.MILLISECONDS);
+		scheduledHeartBeatTask = executor.scheduleWithFixedDelay(new HeartBeatTask(), HeartBeater.intervalInMillis, HeartBeater.intervalInMillis, TimeUnit.MILLISECONDS);
 	}
 
 	public void stop() {
@@ -132,12 +133,12 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 		// Remove it from destination set
 		destinations.remove(ep);
 	}
-	
+
 	private void initializeStatusMsg() {
 		logger.info("Initalize status msg");
 		Set<KeyMetaData> keys = HBUtils.getLocalSavedPartitionKeys();
 		for (KeyMetaData keyMetaData : keys) {
-			updateStatusMsgMap(keyMetaData.getKsName(), keyMetaData.getCfName(), keyMetaData.getKey());
+			updateStatusMsgMap(keyMetaData.getKsName(), keyMetaData.getCfName(), keyMetaData.getKey(), keyMetaData.getRow());
 		}
 	}
 
@@ -148,18 +149,21 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 			for (ColumnFamily cf : mutation.getColumnFamilies()) {
 				Version version = HBUtils.getMutationVersion(cf);
 				if (version != null)
-					updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, version.getLocalVersion(),
-							version.getTimestamp());
+					updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, version.getLocalVersion(), version.getTimestamp());
 			}
 		}
 	}
 
-	private void updateStatusMsgMap(String inKSName, String inCFName, ByteBuffer partitionKey) {
-		Row value = HBUtils.getKeyValue(inKSName, inCFName, partitionKey);
+	private void updateStatusMsgMap(String inKSName, String inCFName, ByteBuffer partitionKey, Row value) {
 		if (value != null) {
 			try {
-				long versionNo = value.getLong(HBConsts.VERSON_NO);
-				long ts = value.getLong(HBConsts.VERSION_WRITE_TIME) / 1000;
+				String source = value.getString(HBConsts.SOURCE);
+				long versionNo = -1;
+				long ts = System.currentTimeMillis();
+				if (localDCName.equalsIgnoreCase(source)) {
+					versionNo = value.getLong(HBConsts.VERSON_NO);
+					ts = value.getLong(HBConsts.VERSION_WRITE_TIME) / 1000;
+				}
 				updateStatusMsgMap(inKSName, inCFName, partitionKey, ts, versionNo);
 			} catch (Exception e) {
 				logger.debug("Exception when update status msg mp", e);
@@ -174,16 +178,14 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	 * @param version
 	 * @param timestamp
 	 */
-	private void updateStatusMsgMap(String inKSName, String inCFName, ByteBuffer partitionKey, Long version,
-			long timestamp) {
+	private void updateStatusMsgMap(String inKSName, String inCFName, ByteBuffer partitionKey, Long version, long timestamp) {
 		List<InetAddress> replicaList = HBUtils.getReplicaList(inKSName, partitionKey);
 		replicaList.remove(replicaList.remove(DatabaseDescriptor.getListenAddress()));
 		CFMetaData cfMetaData = Schema.instance.getKSMetaData(inKSName).cfMetaData().get(inCFName);
 		for (InetAddress inetAddress : replicaList) {
 			StatusSynMsg statusMsgSyn = m_statusMsgMap.get(inetAddress);
 			if (statusMsgSyn == null) {
-				statusMsgSyn = new StatusSynMsg(DatabaseDescriptor.getLocalDataCenter(), null,
-						System.currentTimeMillis());
+				statusMsgSyn = new StatusSynMsg(DatabaseDescriptor.getLocalDataCenter(), null, System.currentTimeMillis());
 				m_statusMsgMap.put(inetAddress, statusMsgSyn);
 			}
 			statusMsgSyn.addKeyVersion(HBUtils.byteBufferToString(cfMetaData, partitionKey), version, timestamp);

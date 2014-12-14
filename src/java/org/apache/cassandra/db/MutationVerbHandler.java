@@ -21,12 +21,18 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 
+import org.apache.cassandra.config.DatabaseDescriptor;
+import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
+import org.apache.cassandra.heartbeat.status.StatusMap;
+import org.apache.cassandra.io.util.FastByteArrayInputStream;
+import org.apache.cassandra.net.CompactEndpointSerializationHelper;
+import org.apache.cassandra.net.IVerbHandler;
+import org.apache.cassandra.net.MessageIn;
+import org.apache.cassandra.net.MessageOut;
+import org.apache.cassandra.net.MessagingService;
+import org.apache.cassandra.tracing.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.apache.cassandra.io.util.FastByteArrayInputStream;
-import org.apache.cassandra.net.*;
-import org.apache.cassandra.tracing.Tracing;
 
 public class MutationVerbHandler implements IVerbHandler<Mutation>
 {
@@ -52,6 +58,14 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
             }
 
             message.payload.apply();
+            
+            // Update multi dc status map
+            String dcName = DatabaseDescriptor.getEndpointSnitch().getDatacenter(message.from);
+            StatusMap.instance.removeEntry(dcName, message.payload);
+            
+            // Notify read subscription
+            ReadHandler.instance.notifySubscription(message.payload);
+            
             WriteResponse response = new WriteResponse();
             Tracing.trace("Enqueuing response to {}", replyTo);
             MessagingService.instance().sendReply(response.createMessage(), id, replyTo);

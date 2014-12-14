@@ -21,28 +21,51 @@ import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
-
-import com.google.common.base.Predicate;
-import com.google.common.cache.CacheLoader;
-import com.google.common.collect.*;
-import com.google.common.util.concurrent.Uninterruptibles;
-import net.nicoulaj.compilecommand.annotations.Inline;
-import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.concurrent.Stage;
 import org.apache.cassandra.concurrent.StageManager;
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.config.Schema;
-import org.apache.cassandra.db.*;
+import org.apache.cassandra.db.AbstractRangeCommand;
+import org.apache.cassandra.db.ArrayBackedSortedColumns;
+import org.apache.cassandra.db.BatchlogManager;
+import org.apache.cassandra.db.ColumnFamily;
+import org.apache.cassandra.db.ColumnFamilyStore;
+import org.apache.cassandra.db.ConsistencyLevel;
+import org.apache.cassandra.db.CounterMutation;
+import org.apache.cassandra.db.HintedHandOffManager;
+import org.apache.cassandra.db.IMutation;
 import org.apache.cassandra.db.Keyspace;
+import org.apache.cassandra.db.Mutation;
+import org.apache.cassandra.db.RangeSliceReply;
+import org.apache.cassandra.db.ReadCommand;
+import org.apache.cassandra.db.ReadResponse;
+import org.apache.cassandra.db.ReadVerbHandler;
+import org.apache.cassandra.db.Row;
+import org.apache.cassandra.db.RowPosition;
+import org.apache.cassandra.db.SystemKeyspace;
+import org.apache.cassandra.db.Truncation;
+import org.apache.cassandra.db.WriteType;
 import org.apache.cassandra.db.index.SecondaryIndex;
 import org.apache.cassandra.db.index.SecondaryIndexSearcher;
 import org.apache.cassandra.db.marshal.UUIDType;
@@ -50,9 +73,16 @@ import org.apache.cassandra.dht.AbstractBounds;
 import org.apache.cassandra.dht.Bounds;
 import org.apache.cassandra.dht.RingPosition;
 import org.apache.cassandra.dht.Token;
-import org.apache.cassandra.exceptions.*;
+import org.apache.cassandra.exceptions.InvalidRequestException;
+import org.apache.cassandra.exceptions.IsBootstrappingException;
+import org.apache.cassandra.exceptions.OverloadedException;
+import org.apache.cassandra.exceptions.ReadTimeoutException;
+import org.apache.cassandra.exceptions.UnavailableException;
+import org.apache.cassandra.exceptions.WriteTimeoutException;
 import org.apache.cassandra.gms.FailureDetector;
 import org.apache.cassandra.gms.Gossiper;
+import org.apache.cassandra.heartbeat.HBUtils;
+import org.apache.cassandra.heartbeat.HeartBeater;
 import org.apache.cassandra.io.util.DataOutputBuffer;
 import org.apache.cassandra.locator.AbstractReplicationStrategy;
 import org.apache.cassandra.locator.IEndpointSnitch;
@@ -61,12 +91,34 @@ import org.apache.cassandra.locator.TokenMetadata;
 import org.apache.cassandra.metrics.ClientRequestMetrics;
 import org.apache.cassandra.metrics.ReadRepairMetrics;
 import org.apache.cassandra.metrics.StorageMetrics;
-import org.apache.cassandra.net.*;
-import org.apache.cassandra.service.paxos.*;
+import org.apache.cassandra.net.AsyncOneResponse;
+import org.apache.cassandra.net.CompactEndpointSerializationHelper;
+import org.apache.cassandra.net.IAsyncCallback;
+import org.apache.cassandra.net.MessageIn;
+import org.apache.cassandra.net.MessageOut;
+import org.apache.cassandra.net.MessagingService;
+import org.apache.cassandra.service.paxos.Commit;
+import org.apache.cassandra.service.paxos.PrepareCallback;
+import org.apache.cassandra.service.paxos.ProposeCallback;
 import org.apache.cassandra.sink.SinkManager;
 import org.apache.cassandra.tracing.Tracing;
 import org.apache.cassandra.triggers.TriggerExecutor;
-import org.apache.cassandra.utils.*;
+import org.apache.cassandra.utils.FBUtilities;
+import org.apache.cassandra.utils.Pair;
+import org.apache.cassandra.utils.UUIDGen;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Predicate;
+import com.google.common.cache.CacheLoader;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.Uninterruptibles;
 
 public class StorageProxy implements StorageProxyMBean
 {
@@ -475,7 +527,6 @@ public class StorageProxy implements StorageProxyMBean
                     responseHandlers.add(performWrite(mutation, consistency_level, localDataCenter, standardWritePerformer, null, wt));
                 }
             }
-
             // wait for writes.  throws TimeoutException if necessary
             for (AbstractWriteResponseHandler responseHandler : responseHandlers)
             {
@@ -1151,6 +1202,7 @@ public class StorageProxy implements StorageProxyMBean
             else
             {
                 rows = fetchRows(commands, consistency_level);
+            	//rows = readLocal(commands);
             }
         }
         catch (UnavailableException e)
@@ -1173,8 +1225,44 @@ public class StorageProxy implements StorageProxyMBean
             for (ReadCommand command : commands)
                 Keyspace.open(command.ksName).getColumnFamilyStore(command.cfName).metric.coordinatorReadLatency.update(latency, TimeUnit.NANOSECONDS);
         }
+        
         return rows;
     }
+    
+	public static List<Row> readLocal(List<ReadCommand> commands) {
+		long start = System.nanoTime();
+		List<Row> rows = null;
+		try {
+			
+			for (ReadCommand cmd : commands) {
+				// Get all the dc name
+				Set<String> dcNames = HBUtils.getDataCenterNames(cmd.getKeyspace());
+
+				// Form a local-one ReadCommd to get the latest value in each data center
+				for (String dcName : dcNames) {
+					ReadCommand dcCommond = null;
+
+				}
+
+				// Check status map to see whether could return
+
+				// If not, create a read handler and put it in the read handler pool
+			}
+			rows = fetchRows(commands, ConsistencyLevel.LOCAL_ONE);
+		} catch (UnavailableException e) {
+			readMetrics.unavailables.mark();
+			ClientRequestMetrics.readUnavailables.inc();
+			logger.info("readLocal ReadTimeoutException", e);
+		} catch (ReadTimeoutException e) {
+			readMetrics.timeouts.mark();
+			ClientRequestMetrics.readTimeouts.inc();
+			logger.info("readLocal ReadTimeoutException", e);
+		} finally {
+			long latency = System.nanoTime() - start;
+			logger.info("readLocal latency {}", latency);
+		}
+		return rows;
+	}
 
     /**
      * This function executes local and remote reads, and blocks for the results:

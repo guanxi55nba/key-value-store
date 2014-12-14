@@ -110,7 +110,7 @@ public class DatabaseDescriptor
     private static IAllocator memoryAllocator;
     private static long indexSummaryCapacityInMB;
 
-    private static String localDC;
+	private static String localDC;
     private static Comparator<InetAddress> localComparator;
 
     static

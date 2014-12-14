@@ -18,40 +18,104 @@
 package org.apache.cassandra.cql3.statements;
 
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
+
+import org.apache.cassandra.auth.Permission;
+import org.apache.cassandra.config.CFMetaData;
+import org.apache.cassandra.config.ColumnDefinition;
+import org.apache.cassandra.cql3.AbstractMarker;
+import org.apache.cassandra.cql3.CFName;
+import org.apache.cassandra.cql3.CQL3Row;
+import org.apache.cassandra.cql3.CQLStatement;
+import org.apache.cassandra.cql3.ColumnIdentifier;
+import org.apache.cassandra.cql3.ColumnSpecification;
+import org.apache.cassandra.cql3.Lists;
+import org.apache.cassandra.cql3.Maps;
+import org.apache.cassandra.cql3.MeasurableForPreparedCache;
+import org.apache.cassandra.cql3.MultiColumnRelation;
+import org.apache.cassandra.cql3.QueryOptions;
+import org.apache.cassandra.cql3.QueryProcessor;
+import org.apache.cassandra.cql3.Relation;
+import org.apache.cassandra.cql3.ResultSet;
+import org.apache.cassandra.cql3.Sets;
+import org.apache.cassandra.cql3.SingleColumnRelation;
+import org.apache.cassandra.cql3.Term;
+import org.apache.cassandra.cql3.Tuples;
+import org.apache.cassandra.cql3.VariableSpecifications;
+import org.apache.cassandra.db.Cell;
+import org.apache.cassandra.db.ColumnFamily;
+import org.apache.cassandra.db.ColumnFamilyStore;
+import org.apache.cassandra.db.ConsistencyLevel;
+import org.apache.cassandra.db.IndexExpression;
+import org.apache.cassandra.db.Keyspace;
+import org.apache.cassandra.db.RangeSliceCommand;
+import org.apache.cassandra.db.ReadCommand;
+import org.apache.cassandra.db.Row;
+import org.apache.cassandra.db.RowPosition;
+import org.apache.cassandra.db.composites.CBuilder;
+import org.apache.cassandra.db.composites.CType;
+import org.apache.cassandra.db.composites.CellName;
+import org.apache.cassandra.db.composites.CellNameType;
+import org.apache.cassandra.db.composites.Composite;
+import org.apache.cassandra.db.composites.Composites;
+import org.apache.cassandra.db.filter.ColumnSlice;
+import org.apache.cassandra.db.filter.IDiskAtomFilter;
+import org.apache.cassandra.db.filter.NamesQueryFilter;
+import org.apache.cassandra.db.filter.SliceQueryFilter;
+import org.apache.cassandra.db.index.SecondaryIndexManager;
+import org.apache.cassandra.db.marshal.CollectionType;
+import org.apache.cassandra.db.marshal.CompositeType;
+import org.apache.cassandra.db.marshal.Int32Type;
+import org.apache.cassandra.db.marshal.MapType;
+import org.apache.cassandra.db.marshal.ReversedType;
+import org.apache.cassandra.dht.AbstractBounds;
+import org.apache.cassandra.dht.Bounds;
+import org.apache.cassandra.dht.ExcludingBounds;
+import org.apache.cassandra.dht.IPartitioner;
+import org.apache.cassandra.dht.IncludingExcludingBounds;
+import org.apache.cassandra.dht.Range;
+import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.exceptions.InvalidRequestException;
+import org.apache.cassandra.exceptions.RequestExecutionException;
+import org.apache.cassandra.exceptions.RequestValidationException;
+import org.apache.cassandra.exceptions.UnauthorizedException;
+import org.apache.cassandra.heartbeat.HBUtils;
+import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
+import org.apache.cassandra.heartbeat.status.StatusMap;
+import org.apache.cassandra.serializers.MarshalException;
+import org.apache.cassandra.service.ClientState;
+import org.apache.cassandra.service.QueryState;
+import org.apache.cassandra.service.StorageProxy;
+import org.apache.cassandra.service.StorageService;
+import org.apache.cassandra.service.pager.Pageable;
+import org.apache.cassandra.service.pager.QueryPager;
+import org.apache.cassandra.service.pager.QueryPagers;
+import org.apache.cassandra.thrift.ThriftValidation;
+import org.apache.cassandra.transport.messages.ResultMessage;
+import org.apache.cassandra.utils.ByteBufferUtil;
+import org.apache.cassandra.utils.FBUtilities;
+import org.apache.cassandra.utils.keyvaluestore.ConfReader;
+import org.github.jamm.MemoryMeter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Predicate;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
-
-import org.github.jamm.MemoryMeter;
-
-import org.apache.cassandra.auth.Permission;
-import org.apache.cassandra.cql3.*;
-import org.apache.cassandra.db.composites.*;
-import org.apache.cassandra.transport.messages.ResultMessage;
-import org.apache.cassandra.config.CFMetaData;
-import org.apache.cassandra.config.ColumnDefinition;
-import org.apache.cassandra.db.*;
-import org.apache.cassandra.db.filter.*;
-import org.apache.cassandra.db.index.SecondaryIndexManager;
-import org.apache.cassandra.db.marshal.*;
-import org.apache.cassandra.dht.*;
-import org.apache.cassandra.exceptions.*;
-import org.apache.cassandra.service.ClientState;
-import org.apache.cassandra.service.QueryState;
-import org.apache.cassandra.service.StorageProxy;
-import org.apache.cassandra.service.StorageService;
-import org.apache.cassandra.service.pager.*;
-import org.apache.cassandra.db.ConsistencyLevel;
-import org.apache.cassandra.thrift.ThriftValidation;
-import org.apache.cassandra.serializers.MarshalException;
-import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.cassandra.utils.FBUtilities;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Encapsulates a completely parsed SELECT query, including the target
@@ -63,6 +127,8 @@ public class SelectStatement implements CQLStatement, MeasurableForPreparedCache
     private static final Logger logger = LoggerFactory.getLogger(SelectStatement.class);
 
     private static final int DEFAULT_COUNT_PAGE_SIZE = 10000;
+    
+    private byte[] lock = new byte[0];
 
     private final int boundTerms;
     public final CFMetaData cfm;
@@ -206,7 +272,22 @@ public class SelectStatement implements CQLStatement, MeasurableForPreparedCache
         // Note that if there are some nodes in the cluster with a version less than 2.0, we can't use paging (CASSANDRA-6707).
         if (parameters.isCount && pageSize <= 0)
             pageSize = DEFAULT_COUNT_PAGE_SIZE;
-
+        
+		if (StatusMap.instance.hasLatestValue(command, now)) {
+			Set<String> ksNames = HBUtils.getReadCommandRelatedKeySpaceNames(command);
+			if(!HBUtils.SYSTEM_KEYSPACES.retainAll(ksNames))
+				logger.info("execute: hasLatestValue -> {}", "true");
+		} else {
+			// sink subscription
+			synchronized (lock) {
+				try {
+					ReadHandler.instance.sinkReadHandler(command, now, lock);
+					lock.wait();
+				} catch (Exception e) {
+					logger.debug("Exception: {}", e.getMessage());
+				}
+			}
+		}
         if (pageSize <= 0 || command == null || !QueryPagers.mayNeedPaging(command, pageSize))
         {
             return execute(command, options, limit, now);
@@ -228,7 +309,48 @@ public class SelectStatement implements CQLStatement, MeasurableForPreparedCache
             return pager.isExhausted() ? msg : msg.withPagingState(pager.state());
         }
     }
+    
+	public ResultMessage.Rows executeOnWake(QueryState state, QueryOptions options, long timestamp) throws RequestExecutionException,
+			RequestValidationException {
+        ConsistencyLevel cl = options.getConsistency();
+        if (cl == null)
+            throw new InvalidRequestException("Invalid empty consistency level");
 
+        cl.validateForRead(keyspace());
+
+        int limit = getLimit(options);
+        long now = timestamp;
+        Pageable command = getPageableCommand(options, limit, now);
+
+        int pageSize = options.getPageSize();
+        // A count query will never be paged for the user, but we always page it internally to avoid OOM.
+        // If we user provided a pageSize we'll use that to page internally (because why not), otherwise we use our default
+        // Note that if there are some nodes in the cluster with a version less than 2.0, we can't use paging (CASSANDRA-6707).
+        if (parameters.isCount && pageSize <= 0)
+            pageSize = DEFAULT_COUNT_PAGE_SIZE;
+
+        if (pageSize <= 0 || command == null || !QueryPagers.mayNeedPaging(command, pageSize))
+        {
+            return execute(command, options, limit, now);
+        }
+        else
+        {
+            QueryPager pager = QueryPagers.pager(command, cl, options.getPagingState());
+            if (parameters.isCount)
+                return pageCountQuery(pager, options, pageSize, now, limit);
+
+            // We can't properly do post-query ordering if we page (see #6722)
+            if (needsPostQueryOrdering())
+                throw new InvalidRequestException("Cannot page queries with both ORDER BY and a IN restriction on the partition key; you must either remove the "
+                                                + "ORDER BY or the IN and sort client side, or disable paging for this query");
+
+            List<Row> page = pager.fetchPage(pageSize);
+            ResultMessage.Rows msg = processResults(page, options, limit, now);
+
+            return pager.isExhausted() ? msg : msg.withPagingState(pager.state());
+        }
+	}
+    
     private Pageable getPageableCommand(QueryOptions options, int limit, long now) throws RequestValidationException
     {
         int limitForQuery = updateLimitForQuery(limit);
@@ -247,6 +369,7 @@ public class SelectStatement implements CQLStatement, MeasurableForPreparedCache
     private ResultMessage.Rows execute(Pageable command, QueryOptions options, int limit, long now) throws RequestValidationException, RequestExecutionException
     {
         List<Row> rows;
+        ConsistencyLevel consistencyLevel = ConfReader.instance.enableWriteReadLocalQuorum()?ConsistencyLevel.LOCAL_ONE:options.getConsistency();
         if (command == null)
         {
             rows = Collections.<Row>emptyList();
@@ -254,8 +377,8 @@ public class SelectStatement implements CQLStatement, MeasurableForPreparedCache
         else
         {
             rows = command instanceof Pageable.ReadCommands
-                 ? StorageProxy.read(((Pageable.ReadCommands)command).commands, options.getConsistency())
-                 : StorageProxy.getRangeSlice((RangeSliceCommand)command, options.getConsistency());
+                 ? StorageProxy.read(((Pageable.ReadCommands)command).commands, consistencyLevel)
+                 : StorageProxy.getRangeSlice((RangeSliceCommand)command, consistencyLevel);
         }
 
         return processResults(rows, options, limit, now);
@@ -283,7 +406,8 @@ public class SelectStatement implements CQLStatement, MeasurableForPreparedCache
         // Even for count, we need to process the result as it'll group some column together in sparse column families
         ResultSet rset = process(rows, options, limit, now);
         rset = parameters.isCount ? rset.makeCountResult(parameters.countAlias) : rset;
-        return new ResultMessage.Rows(rset);
+        ResultMessage.Rows result = new ResultMessage.Rows(rset);         
+        return result;
     }
 
     static List<Row> readLocally(String keyspaceName, List<ReadCommand> cmds)

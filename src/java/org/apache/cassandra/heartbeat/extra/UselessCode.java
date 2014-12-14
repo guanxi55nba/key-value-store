@@ -1,12 +1,5 @@
 package org.apache.cassandra.heartbeat.extra;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-
-import org.apache.cassandra.config.DatabaseDescriptor;
-import org.apache.cassandra.heartbeat.StatusSynMsg;
 
 
 public class UselessCode {

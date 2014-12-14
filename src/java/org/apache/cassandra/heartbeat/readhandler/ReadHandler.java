@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.apache.cassandra.Util;
 import org.apache.cassandra.db.BufferCell;
 import org.apache.cassandra.db.Cell;
 import org.apache.cassandra.db.ColumnFamily;
@@ -43,7 +42,7 @@ public class ReadHandler {
 		String ksName = inMutation.getKeyspaceName();
 		if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName)) {
 			for (ColumnFamily columnFamily : inMutation.getColumnFamilies()) {
-				Cell cell = columnFamily.getColumn(Util.cellname(HBConsts.VERSON_NO));
+				Cell cell = columnFamily.getColumn(HBUtils.cellname(HBConsts.VERSON_NO));
 				if (cell instanceof BufferCell) {
 					BufferCell bufferCell = (BufferCell) cell;
 					final long timestamp = bufferCell.timestamp();

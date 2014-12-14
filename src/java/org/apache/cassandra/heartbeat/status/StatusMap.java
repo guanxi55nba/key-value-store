@@ -41,16 +41,23 @@ public class StatusMap {
 	}
 
 	public void updateStatusMap(String inDCName, StatusSynMsg inSynMsg) {
-		TreeMap<String, TreeMap<Long, Long>> statusData = inSynMsg.getData();
-		for (Map.Entry<String, TreeMap<Long, Long>> entry : statusData.entrySet()) {
-			String key = entry.getKey();
-			Status status = m_currentEntries.get(key, inDCName);
-			if (status == null) {
-				status = new Status(inSynMsg.getTimestamp(), entry.getValue());
-				m_currentEntries.put(key, inDCName, status);
-			} else {
-				status.updateVnTsData(entry.getValue());
+		if (inSynMsg != null) {
+			TreeMap<String, TreeMap<Long, Long>> statusData = inSynMsg
+					.getData();
+			for (Map.Entry<String, TreeMap<Long, Long>> entry : statusData
+					.entrySet()) {
+				String key = entry.getKey();
+				Status status = m_currentEntries.get(key, inDCName);
+				if (status == null) {
+					status = new Status(inSynMsg.getTimestamp(),
+							entry.getValue());
+					m_currentEntries.put(key, inDCName, status);
+				} else {
+					status.updateVnTsData(entry.getValue());
+				}
 			}
+		}else{
+			logger.error("inSynMsg is null");
 		}
 	}
 
@@ -64,8 +71,10 @@ public class StatusMap {
 				Status currentStatus = m_currentEntries.get(key, inDcName);
 				TreeMap<Long, Long> removedEntry = new TreeMap<Long, Long>();
 				if (currentStatus != null) {
-					for (ColumnFamily columnFamily : inMutation.getColumnFamilies()) {
-						Cell cell = columnFamily.getColumn(Util.cellname(HBConsts.VERSON_NO));
+					for (ColumnFamily columnFamily : inMutation
+							.getColumnFamilies()) {
+						Cell cell = columnFamily.getColumn(HBUtils
+								.cellname(HBConsts.VERSON_NO));
 						if (cell instanceof BufferCell) {
 							BufferCell bufferCell = (BufferCell) cell;
 							Long version = bufferCell.value().getLong();
@@ -80,7 +89,8 @@ public class StatusMap {
 				// Update removed status
 				Status removedStatus = m_removedEntries.get(key, inDcName);
 				if (removedStatus == null) {
-					removedStatus = new Status(currentStatus.getUpdateTs(), removedEntry);
+					removedStatus = new Status(currentStatus.getUpdateTs(),
+							removedEntry);
 					m_removedEntries.put(key, inDcName, removedStatus);
 				} else {
 					removedStatus.updateVnTsData(removedEntry);
@@ -110,11 +120,14 @@ public class StatusMap {
 						if (status.getUpdateTs() <= inTimestamp) {
 							hasLatestValue = false;
 						} else {
-							TreeMap<Long, Long> versions = status.getVersionTsMap(); // vn: ts
-							// if doesn't exist entry whose timestamp < inTimestamp, then row is the latest in this
+							TreeMap<Long, Long> versions = status
+									.getVersionTsMap(); // vn: ts
+							// if doesn't exist entry whose timestamp <
+							// inTimestamp, then row is the latest in this
 							// datacenter
 							long latestVersion = -2;
-							for (Map.Entry<Long, Long> entry : versions.entrySet()) {
+							for (Map.Entry<Long, Long> entry : versions
+									.entrySet()) {
 								long version = entry.getKey();
 								long timestamp = entry.getValue();
 								if (timestamp <= inTimestamp) {

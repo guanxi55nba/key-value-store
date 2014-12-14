@@ -91,7 +91,7 @@ public class StatusMap {
 					removedStatus = new Status(currentStatus.getUpdateTs(),
 							removedEntry);
 					m_removedEntries.put(key, inDcName, removedStatus);
-				} else {
+				} else if(removedStatus != null) {
 					removedStatus.updateVnTsData(removedEntry);
 				}
 			} else if (inKey == null) {

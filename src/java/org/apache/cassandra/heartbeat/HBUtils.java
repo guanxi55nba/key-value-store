@@ -164,7 +164,7 @@ public class HBUtils {
 			try {
 				StringBuilder sb = new StringBuilder();
 				sb.append("select ");
-				sb.append(inPrimaryKeyName);
+				sb.append(inPrimaryKeyName +", " + HBConsts.SOURCE);
 				sb.append(" from ");
 				sb.append(inKSName);
 				sb.append(".");

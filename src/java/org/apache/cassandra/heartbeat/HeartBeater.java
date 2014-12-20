@@ -62,21 +62,24 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	private AtomicInteger version = new AtomicInteger(0);
 	public static final HeartBeater instance = new HeartBeater();
 	private String localDCName = DatabaseDescriptor.getLocalDataCenter();
+	private boolean enable = ConfReader.instance.heartbeatEnable();
 
 	private HeartBeater() {
-		/*
-		 * register with the Failure Detector for receiving Failure detector
-		 * events
-		 */
-		FailureDetector.instance.registerFailureDetectionEventListener(this);
+		if (enable) {
+			/*
+			 * register with the Failure Detector for receiving Failure detector
+			 * events
+			 */
+			FailureDetector.instance.registerFailureDetectionEventListener(this);
 
-		// Register this instance with JMX
-		try {
-			MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
-			mbs.registerMBean(this, new ObjectName(MBEAN_NAME));
-		} catch (Exception e) {
-			logger.error("exception when register HeartBeater", e);
-			throw new RuntimeException(e);
+			// Register this instance with JMX
+			try {
+				MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+				mbs.registerMBean(this, new ObjectName(MBEAN_NAME));
+			} catch (Exception e) {
+				logger.error("exception when register HeartBeater", e);
+				throw new RuntimeException(e);
+			}
 		}
 	}
 
@@ -110,22 +113,25 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	}
 
 	public void start() {
-		initializeStatusMsg();
-
-		logger.info("Schedule task to send out heartbeat if needed");
-
-		scheduledHeartBeatTask = executor.scheduleWithFixedDelay(new HeartBeatTask(), HeartBeater.intervalInMillis, HeartBeater.intervalInMillis, TimeUnit.MILLISECONDS);
+		if(enable) {
+			logger.info("Starting up server heartbeater");
+			initializeStatusMsg();
+			logger.info("Schedule task to send out heartbeat if needed");
+			scheduledHeartBeatTask = executor.scheduleWithFixedDelay(new HeartBeatTask(), HeartBeater.intervalInMillis, HeartBeater.intervalInMillis, TimeUnit.MILLISECONDS);
+		}
 	}
 
 	public void stop() {
-		logger.info("Stop Heartbeater");
-		if (scheduledHeartBeatTask != null)
-			scheduledHeartBeatTask.cancel(false);
-		Uninterruptibles.sleepUninterruptibly(intervalInMillis * 2, TimeUnit.MILLISECONDS);
-		@SuppressWarnings("rawtypes")
-		MessageOut message = new MessageOut(MessagingService.Verb.HEARTBEAT_SHOWDOWN);
-		for (InetAddress ep : destinations)
-			MessagingService.instance().sendOneWay(message, ep);
+		if(enable) {
+			logger.info("Stop Heartbeater");
+			if (scheduledHeartBeatTask != null)
+				scheduledHeartBeatTask.cancel(false);
+			Uninterruptibles.sleepUninterruptibly(intervalInMillis * 2, TimeUnit.MILLISECONDS);
+			@SuppressWarnings("rawtypes")
+			MessageOut message = new MessageOut(MessagingService.Verb.HEARTBEAT_SHOWDOWN);
+			for (InetAddress ep : destinations)
+				MessagingService.instance().sendOneWay(message, ep);
+		}
 	}
 
 	@Override
@@ -134,14 +140,11 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 		destinations.remove(ep);
 	}
 
-	private void initializeStatusMsg() {
-		logger.info("Initalize status msg");
-		Set<KeyMetaData> keys = HBUtils.getLocalSavedPartitionKeys();
-		for (KeyMetaData keyMetaData : keys) {
-			updateStatusMsgMap(keyMetaData.getKsName(), keyMetaData.getCfName(), keyMetaData.getKey(), keyMetaData.getRow());
-		}
-	}
-
+	/**
+	 * Called by {@link Mutation.apply}
+	 * 
+	 * @param mutation
+	 */
 	public void updateStatusMsgMap(Mutation mutation) {
 		ByteBuffer partitionKey = mutation.key();
 		String ksName = mutation.getKeyspaceName();
@@ -149,13 +152,32 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 			for (ColumnFamily cf : mutation.getColumnFamilies()) {
 				Version version = HBUtils.getMutationVersion(cf);
 				if (version != null) {
-					long timestamp = version.getTimestamp()/1000;
+					long timestamp = version.getTimestamp() / 1000;
 					updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, version.getLocalVersion(), timestamp);
 				}
 			}
 		}
 	}
 
+	/**
+	 * Called by {@link HeartBeater::start}
+	 */
+	private void initializeStatusMsg() {
+		logger.info("Initalize status msg");
+		Set<KeyMetaData> keys = HBUtils.getLocalSavedPartitionKeys();
+		for (KeyMetaData keyMetaData : keys) {
+			updateStatusMsgMap(keyMetaData.getKsName(), keyMetaData.getCfName(), keyMetaData.getKey(), keyMetaData.getRow());
+		}
+	}
+	
+	/**
+	 * Called by {@link initializeStatusMsg} & {@link updateStatusMsgMap } 
+	 * 
+	 * @param inKSName
+	 * @param inCFName
+	 * @param partitionKey
+	 * @param value
+	 */
 	private void updateStatusMsgMap(String inKSName, String inCFName, ByteBuffer partitionKey, Row value) {
 		if (value != null) {
 			try {
@@ -194,6 +216,9 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 		}
 	}
 
+	/**
+	 * Called by {@link HeartbeatTask.run}
+	 */
 	private void clearStatusMap() {
 		for (StatusSynMsg msg : m_statusMsgMap.values()) {
 			msg.cleanData();

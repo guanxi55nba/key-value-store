@@ -12,6 +12,7 @@ public class ConfReader {
 	private static final Logger logger = LoggerFactory.getLogger(ConfReader.class);
 	public static Properties configuration;
 	public static Properties tranProperties;
+	private boolean heartbeatEnable = false;
 	public static final ConfReader instance = new ConfReader();
 
 	private ConfReader() {
@@ -19,6 +20,7 @@ public class ConfReader {
 		String confStr = "conf" + File.separator + "key-value-store.conf";
 		try {
 			configuration.load(new FileInputStream(new File(confStr)));
+			heartbeatEnable = Boolean.valueOf(configuration.getProperty("heartbeat.enable"));
 		} catch (IOException e) {
 			logger.error("Failed to load configuration " + confStr);
 			e.printStackTrace();
@@ -44,5 +46,9 @@ public class ConfReader {
 	
 	public boolean enableWriteReadLocalQuorum() {
 		return Boolean.valueOf(configuration.getProperty("enable.write-read-local-quorum"));
+	}
+	
+	public boolean heartbeatEnable() {
+		return heartbeatEnable;
 	}
 }

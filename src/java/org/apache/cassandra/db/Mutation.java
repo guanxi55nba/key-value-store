@@ -39,6 +39,7 @@ import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.net.MessageOut;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.utils.ByteBufferUtil;
+import org.apache.cassandra.utils.keyvaluestore.ConfReader;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -218,7 +219,8 @@ public class Mutation implements IMutation
     {
         Keyspace ks = Keyspace.open(keyspaceName);
         ks.apply(this, ks.metadata.durableWrites);
-        HeartBeater.instance.updateStatusMsgMap(this);
+        if(ConfReader.instance.heartbeatEnable())
+        	HeartBeater.instance.updateStatusMsgMap(this);
     }
 
     public void applyUnsafe()

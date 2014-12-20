@@ -8,24 +8,32 @@ import org.apache.cassandra.db.ConsistencyLevel;
 import org.apache.cassandra.heartbeat.status.StatusMap;
 import org.apache.cassandra.net.IVerbHandler;
 import org.apache.cassandra.net.MessageIn;
+import org.apache.cassandra.utils.keyvaluestore.ConfReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Registered in Storage Service
+ * 
+ * @author xig
+ *
+ */
 public class HeartBeatVerbHandler implements IVerbHandler<StatusSynMsg> {
 
 	private static final Logger logger = LoggerFactory.getLogger(HeartBeatVerbHandler.class);
 
 	@Override
 	public void doVerb(MessageIn<StatusSynMsg> message, int id) {
-		// Get datacenter name
-		InetAddress from = message.from;
-		String dcName = DatabaseDescriptor.getEndpointSnitch().getDatacenter(from);
+		if(ConfReader.instance.heartbeatEnable()) {
+			// Get datacenter name
+			InetAddress from = message.from;
+			String dcName = DatabaseDescriptor.getEndpointSnitch().getDatacenter(from);
 
-		// Update multi dc status map
-		StatusMap.instance.updateStatusMap(dcName, message.payload);
+			// Update multi dc status map
+			StatusMap.instance.updateStatusMap(dcName, message.payload);
 
-		// Check pending read
-
+			// Check pending read
+		}
 	}
 
 	/**

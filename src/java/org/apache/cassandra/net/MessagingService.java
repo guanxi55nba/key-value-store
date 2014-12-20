@@ -66,6 +66,7 @@ import org.apache.cassandra.tracing.TraceState;
 import org.apache.cassandra.tracing.Tracing;
 import org.apache.cassandra.utils.*;
 import org.apache.cassandra.utils.concurrent.SimpleCondition;
+import org.apache.cassandra.utils.keyvaluestore.ConfReader;
 
 public final class MessagingService implements MessagingServiceMBean
 {
@@ -739,7 +740,7 @@ public final class MessagingService implements MessagingServiceMBean
             return;
         }
         
-		if (message.payload instanceof StatusSynMsg) {
+		if (message.payload instanceof StatusSynMsg && ConfReader.instance.heartbeatEnable()) {
 			logger.info("Receive status SynMsg" + ((StatusSynMsg) message.payload).toString());
 		}
 

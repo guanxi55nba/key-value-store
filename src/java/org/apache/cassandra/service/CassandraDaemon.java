@@ -27,16 +27,11 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import javax.management.StandardMBean;
 
-import com.google.common.collect.Iterables;
-import com.google.common.util.concurrent.Uninterruptibles;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.addthis.metrics.reporter.config.ReporterConfig;
 import org.apache.cassandra.concurrent.JMXEnabledThreadPoolExecutor;
 import org.apache.cassandra.concurrent.Stage;
 import org.apache.cassandra.concurrent.StageManager;
@@ -62,6 +57,12 @@ import org.apache.cassandra.utils.CLibrary;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.Mx4jTool;
 import org.apache.cassandra.utils.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.addthis.metrics.reporter.config.ReporterConfig;
+import com.google.common.collect.Iterables;
+import com.google.common.util.concurrent.Uninterruptibles;
 
 /**
  * The <code>CassandraDaemon</code> is an abstraction for a Cassandra daemon
@@ -380,7 +381,6 @@ public class CassandraDaemon
         nativeServer = new org.apache.cassandra.transport.Server(nativeAddr, nativePort);
         
         // HeartBeater
-        logger.info("Starting up server heartbeater");
         HeartBeater.instance.start();
     }
 

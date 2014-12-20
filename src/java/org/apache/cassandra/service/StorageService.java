@@ -142,6 +142,7 @@ import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.OutputHandler;
 import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.WrappedRunnable;
+import org.apache.cassandra.utils.keyvaluestore.ConfReader;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -331,7 +332,9 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
 
         MessagingService.instance().registerVerbHandlers(MessagingService.Verb.SNAPSHOT, new SnapshotVerbHandler());
         MessagingService.instance().registerVerbHandlers(MessagingService.Verb.ECHO, new EchoVerbHandler());
-        MessagingService.instance().registerVerbHandlers(MessagingService.Verb.HEARTBEAT_DIGEST, new HeartBeatVerbHandler());
+        if(ConfReader.instance.heartbeatEnable()) {
+        	MessagingService.instance().registerVerbHandlers(MessagingService.Verb.HEARTBEAT_DIGEST, new HeartBeatVerbHandler());
+        }
     }
 
     public void registerDaemon(CassandraDaemon daemon)

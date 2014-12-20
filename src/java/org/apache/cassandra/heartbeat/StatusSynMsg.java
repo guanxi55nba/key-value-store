@@ -68,19 +68,19 @@ public class StatusSynMsg {
 
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
-		sb.append("{");
-		sb.append("DCName:");
+		sb.append("{ ");
+		sb.append("DCName: ");
 		sb.append(dcName);
-		sb.append(",");
+		sb.append(", ");
 		for (Map.Entry<String, TreeMap<Long, Long>> dataEntry : m_data.entrySet()) {
 			sb.append(dataEntry.getKey());
 			sb.append(":");
-			sb.append("[");
+			sb.append("[ ");
 			for (Map.Entry<Long, Long> entry : dataEntry.getValue().entrySet()) {
-				sb.append(entry.getValue().intValue());
+				sb.append(entry.getKey());
 				sb.append(":");
 				sb.append("'");
-				sb.append(DateFormatUtils.format(new Date(entry.getKey()), "yyyy-MM-dd HH:mm:ss"));
+				sb.append(DateFormatUtils.format(new Date(entry.getValue()), "yyyy-MM-dd HH:mm:ss"));
 				sb.append("'");
 				sb.append(",");
 			}
@@ -88,11 +88,11 @@ public class StatusSynMsg {
 				sb.setCharAt(sb.length() - 1, ']');
 			else
 				sb.append("]");
-			sb.append(",");
+			sb.append(", ");
 		}
-		sb.append("TS:");
+		sb.append("TS : ");
 		sb.append(DateFormatUtils.format(new Date(timestamp), "yyyy-MM-dd HH:mm:SS"));
-		sb.append("}");
+		sb.append(" }");
 		return sb.toString();
 	}
 

@@ -148,8 +148,10 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 		if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName)) {
 			for (ColumnFamily cf : mutation.getColumnFamilies()) {
 				Version version = HBUtils.getMutationVersion(cf);
-				if (version != null)
-					updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, version.getLocalVersion(), version.getTimestamp());
+				if (version != null) {
+					long timestamp = version.getTimestamp()/1000;
+					updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, version.getLocalVersion(), timestamp);
+				}
 			}
 		}
 	}
@@ -162,7 +164,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 				long ts = System.currentTimeMillis();
 				if (localDCName.equalsIgnoreCase(source)) {
 					versionNo = value.getLong(HBConsts.VERSON_NO);
-					ts = value.getTimestamp(HBConsts.VERSON_NO).getTime() / 1000;
+					ts = value.getLong(HBConsts.VERSION_WRITE_TIME) / 1000;
 				}
 				updateStatusMsgMap(inKSName, inCFName, partitionKey, ts, versionNo);
 			} catch (Exception e) {

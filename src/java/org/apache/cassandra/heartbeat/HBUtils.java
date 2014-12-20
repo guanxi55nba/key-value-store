@@ -163,7 +163,14 @@ public class HBUtils {
 		if (inPrimaryKeyName != null && !inPrimaryKeyName.isEmpty()) {
 			try {
 				StringBuilder sb = new StringBuilder();
-				sb.append("select *");
+				sb.append("select ");
+				sb.append(inPrimaryKeyName);
+				sb.append(", ");
+				sb.append(HBConsts.VERSON_NO);
+				sb.append(", ");
+				sb.append(HBConsts.SOURCE);
+				sb.append(", ");
+				sb.append(HBConsts.VERSION_WRITE_TIME);
 				sb.append(" from ");
 				sb.append(inKSName);
 				sb.append(".");

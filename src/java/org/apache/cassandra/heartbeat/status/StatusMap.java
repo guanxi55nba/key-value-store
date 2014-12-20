@@ -48,8 +48,7 @@ public class StatusMap {
 				String key = entry.getKey();
 				Status status = m_currentEntries.get(key, inDCName);
 				if (status == null) {
-					status = new Status(inSynMsg.getTimestamp(),
-							entry.getValue());
+					status = new Status(inSynMsg.getTimestamp(), entry.getValue());
 					m_currentEntries.put(key, inDCName, status);
 				} else {
 					status.updateVnTsData(entry.getValue());
@@ -119,11 +118,10 @@ public class StatusMap {
 						if (status.getUpdateTs() <= inTimestamp) {
 							hasLatestValue = false;
 						} else {
-							TreeMap<Long, Long> versions = status
-									.getVersionTsMap(); // vn: ts
-							// if doesn't exist entry whose timestamp <
-							// inTimestamp, then row is the latest in this
-							// datacenter
+							// vn: ts
+							TreeMap<Long, Long> versions = status.getVersionTsMap(); 
+							// if doesn't exist entry whose timestamp <inTimestamp, 
+							// then row is the latest in this datacenter
 							long latestVersion = -2;
 							for (Map.Entry<Long, Long> entry : versions
 									.entrySet()) {

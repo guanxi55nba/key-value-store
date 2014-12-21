@@ -218,7 +218,7 @@ public class Mutation implements IMutation
      */
     public void apply()
     {
-        Keyspace ks = Keyspace.open(keyspaceName);
+        Keyspace ks = Keyspace.open(keyspaceName);       
         ks.apply(this, ks.metadata.durableWrites);
     }
 

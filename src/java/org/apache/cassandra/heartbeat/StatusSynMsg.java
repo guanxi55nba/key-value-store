@@ -91,7 +91,7 @@ public class StatusSynMsg {
 			sb.append(", ");
 		}
 		sb.append("TS : ");
-		sb.append(DateFormatUtils.format(new Date(timestamp), "yyyy-MM-dd HH:mm:SS"));
+		sb.append(DateFormatUtils.format(timestamp, "yyyy-MM-dd HH:mm:ss"));
 		sb.append(" }");
 		return sb.toString();
 	}

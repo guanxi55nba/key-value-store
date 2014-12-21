@@ -76,6 +76,10 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
                     
                     // Notify read subscription
                     ReadHandler.instance.notifySubscription(copy);
+                    
+                    if(copy.getKeyspaceName().equals("demo")){
+                		logger.info("Mutation: {}", this.toString());
+                	}
             	}else {
             		logger.error("MutationVerbHandler::doVerb, mutation is null");;
             	}	

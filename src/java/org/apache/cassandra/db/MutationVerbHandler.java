@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 
 import org.apache.cassandra.config.DatabaseDescriptor;
+import org.apache.cassandra.heartbeat.HeartBeater;
 import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
 import org.apache.cassandra.heartbeat.status.StatusMap;
 import org.apache.cassandra.io.util.FastByteArrayInputStream;
@@ -57,16 +58,27 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
             {
                 replyTo = InetAddress.getByAddress(from);
             }
+            
+            Mutation copy = null;
+            if(message.payload!=null&&ConfReader.instance.heartbeatEnable())
+            	copy = message.payload.copy();
 
             message.payload.apply();
             
             if(ConfReader.instance.heartbeatEnable()) {
-            	// Update multi dc status map
-                String dcName = DatabaseDescriptor.getEndpointSnitch().getDatacenter(message.from);
-                StatusMap.instance.removeEntry(dcName, message.payload);
-                
-                // Notify read subscription
-                ReadHandler.instance.notifySubscription(message.payload);
+            	if(copy!=null) {
+            		// Update status msg map
+            		HeartBeater.instance.updateStatusMsgMap(copy);
+            		
+                	// Update multi dc status map
+                    String dcName = DatabaseDescriptor.getEndpointSnitch().getDatacenter(message.from);
+                    StatusMap.instance.removeEntry(dcName, copy);
+                    
+                    // Notify read subscription
+                    ReadHandler.instance.notifySubscription(copy);
+            	}else {
+            		logger.error("MutationVerbHandler::doVerb, mutation is null");;
+            	}	
             }
             WriteResponse response = new WriteResponse();
             Tracing.trace("Enqueuing response to {}", replyTo);

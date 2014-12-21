@@ -219,8 +219,6 @@ public class Mutation implements IMutation
     {
         Keyspace ks = Keyspace.open(keyspaceName);
         ks.apply(this, ks.metadata.durableWrites);
-        if(ConfReader.instance.heartbeatEnable())
-        	HeartBeater.instance.updateStatusMsgMap(this);
     }
 
     public void applyUnsafe()

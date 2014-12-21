@@ -49,6 +49,11 @@ public class StatusSynMsg {
 		this.timestamp = timestamp;
 	}
 
+	/**
+	 * { key: [vn, ts] }
+	 * 
+	 * @return
+	 */
 	public TreeMap<String, TreeMap<Long, Long>> getData() {
 		return m_data;
 	}

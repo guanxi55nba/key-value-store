@@ -146,16 +146,20 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	 * @param mutation
 	 */
 	public void updateStatusMsgMap(Mutation mutation) {
-		ByteBuffer partitionKey = mutation.key();
-		String ksName = mutation.getKeyspaceName();
-		if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName)) {
-			for (ColumnFamily cf : mutation.getColumnFamilies()) {
-				Version version = HBUtils.getMutationVersion(cf);
-				if (version != null) {
-					long timestamp = version.getTimestamp() / 1000;
-					updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, version.getLocalVersion(), timestamp);
+		if(mutation!=null) {
+			ByteBuffer partitionKey = mutation.key();
+			String ksName = mutation.getKeyspaceName();
+			if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName)) {
+				for (ColumnFamily cf : mutation.getColumnFamilies()) {
+					Version version = HBUtils.getMutationVersion(cf);
+					if (version != null) {
+						long timestamp = version.getTimestamp() / 1000;
+						updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, version.getLocalVersion(), timestamp);
+					}
 				}
 			}
+		}else {
+			logger.error("HeartBeater::updateStatusMsgMap, mutation is null");
 		}
 	}
 

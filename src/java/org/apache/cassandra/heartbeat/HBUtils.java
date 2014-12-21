@@ -149,7 +149,14 @@ public class HBUtils {
 			BufferCell bufferCell = (BufferCell) cell;
 			try {
 				long timestamp = bufferCell.timestamp();
-				long versionNo = bufferCell.value().getLong();
+				ByteBuffer value = bufferCell.value();
+				int capacity = value.capacity();
+				long versionNo = -1;
+				if(capacity>0){
+					versionNo = value.getLong();
+				}else{
+					logger.error("HBUtils.getMutationVersion, versionNo is null ");
+				}
 				version = new Version(versionNo, timestamp);
 			} catch (Exception e) {
 				logger.error("getMutationVersion exception {} ", e);

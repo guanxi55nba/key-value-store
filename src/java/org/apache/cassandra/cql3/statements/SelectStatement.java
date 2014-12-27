@@ -279,6 +279,8 @@ public class SelectStatement implements CQLStatement, MeasurableForPreparedCache
 			if(!intersection.retainAll(ksNames))
 				logger.info("execute: hasLatestValue -> {}", "true");
 		} else {
+			logger.info("execute: hasLatestValue -> {}", "false");
+			
 			// sink subscription
 			synchronized (lock) {
 				try {

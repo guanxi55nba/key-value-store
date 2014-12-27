@@ -158,7 +158,7 @@ public class HBUtils {
 		String source = "";
 		Cell cell = columnFamily.getColumn(HBUtils.cellname(HBConsts.SOURCE));
 		try {
-			source =cell.value().asReadOnlyBuffer().asCharBuffer().toString();
+			source =ByteBufferUtil.string(cell.value());
 		} catch (Exception e) {
 			logger.error("getMutationVersion exception {} ", e);
 		}

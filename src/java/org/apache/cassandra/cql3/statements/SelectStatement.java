@@ -275,7 +275,8 @@ public class SelectStatement implements CQLStatement, MeasurableForPreparedCache
         
 		if (StatusMap.instance.hasLatestValue(command, now)) {
 			Set<String> ksNames = HBUtils.getReadCommandRelatedKeySpaceNames(command);
-			if(!HBUtils.SYSTEM_KEYSPACES.retainAll(ksNames))
+			Set<String> intersection = new HashSet<String>(HBUtils.SYSTEM_KEYSPACES);
+			if(!intersection.retainAll(ksNames))
 				logger.info("execute: hasLatestValue -> {}", "true");
 		} else {
 			// sink subscription

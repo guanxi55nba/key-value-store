@@ -154,9 +154,12 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 					String source = HBUtils.getMutationSource(cf);
 					if (localDCName != null) {
 						Version vn = HBUtils.getMutationVersion(cf);
-						if (localDCName.equalsIgnoreCase(source) && vn != null) {
+						if(vn!=null){
+							long versionNo = localDCName.equalsIgnoreCase(source)?vn.getLocalVersion():-1;
 							long timestamp = vn.getTimestamp() / 1000;
-							updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, vn.getLocalVersion(), timestamp);
+							updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, versionNo, timestamp);
+						}else{
+							logger.error("HeartBeater::updateStatusMsgMap, VersionNo is null");
 						}
 					} else {
 						logger.error("HeartBeater::updateStatusMsgMap, localDCName is null");
@@ -192,13 +195,9 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 		if (value != null) {
 			try {
 				String source = value.getString(HBConsts.SOURCE);
-				long versionNo = -1;
-				long ts = System.currentTimeMillis();
-				if (localDCName.equalsIgnoreCase(source)) {
-					versionNo = value.getLong(HBConsts.VERSON_NO);
-					ts = value.getLong(HBConsts.VERSION_WRITE_TIME) / 1000;
-				}
-				updateStatusMsgMap(inKSName, inCFName, partitionKey, versionNo, ts);
+				long vn = localDCName.equalsIgnoreCase(source)?value.getLong(HBConsts.VERSON_NO):-1;
+				long ts = value.getLong(HBConsts.VERSION_WRITE_TIME) / 1000;
+				updateStatusMsgMap(inKSName, inCFName, partitionKey, vn, ts);
 			} catch (Exception e) {
 				logger.debug("Exception when update status msg mp", e);
 			}

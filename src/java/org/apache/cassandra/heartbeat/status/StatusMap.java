@@ -1,20 +1,17 @@
 package org.apache.cassandra.heartbeat.status;
 
-import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.cassandra.config.DatabaseDescriptor;
-import org.apache.cassandra.db.BufferCell;
-import org.apache.cassandra.db.Cell;
 import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.ReadCommand;
 import org.apache.cassandra.heartbeat.HBUtils;
 import org.apache.cassandra.heartbeat.StatusSynMsg;
-import org.apache.cassandra.heartbeat.extra.HBConsts;
+import org.apache.cassandra.heartbeat.extra.Version;
 import org.apache.cassandra.service.pager.Pageable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,41 +84,25 @@ public class StatusMap {
 	public void removeEntry(String inDcName, final Mutation inMutation) {
 		if (inDcName != null && inMutation != null) {
 			String ksName = inMutation.getKeyspaceName();
+			long currentTs = System.currentTimeMillis();
 			if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName)) {
 				for (ColumnFamily col : inMutation.getColumnFamilies()) {
 					String key = HBUtils.getPrimaryKeyName(col.metadata());
 					Status currentStatus = m_currentEntries.get(key, inDcName);
 					TreeMap<Long, Long> removedEntry = new TreeMap<Long, Long>();
-					for (ColumnFamily columnFamily : inMutation.getColumnFamilies()) {
-						Cell cell = columnFamily.getColumn(HBUtils.cellname(HBConsts.VERSON_NO));
-						if (cell instanceof BufferCell) {
-							BufferCell bufferCell = (BufferCell) cell;
-							ByteBuffer value = bufferCell.value();
-							Long version = null;
-							if (value != null && value.capacity() > 0) {
-								version = value.getLong();
-							}
-							if (version != null) {
-								Long ts = null;
-								// Update current status
-								if (currentStatus != null) {
-									ts = currentStatus.removeEntry(version);
-								}
-								if (ts == null)
-									ts = System.currentTimeMillis();
-								removedEntry.put(version, ts);
-							} else {
-								logger.error("StatusMap::removeEntry, version value is null, mutation: {}", inMutation);
-							}
-						} else {
-							logger.error("StatusMap::removeEntry, cell is not type of BufferCell");
-						}
+					Version version = HBUtils.getMutationVersion(col);
+					if (version != null) {
+						if (currentStatus != null)
+							currentStatus.removeEntry(version.getLocalVersion());
+						removedEntry.put(version.getLocalVersion(), currentTs);
+					} else {
+						logger.error("StatusMap::removeEntry, version value is null, mutation: {}", inMutation);
 					}
 
 					// Update removed status
 					Status removedStatus = m_removedEntries.get(key, inDcName);
 					if (removedStatus == null && currentStatus != null) {
-						removedStatus = new Status(System.currentTimeMillis(), removedEntry);
+						removedStatus = new Status(currentTs, removedEntry);
 						m_removedEntries.put(key, inDcName, removedStatus);
 					} else if (removedStatus != null) {
 						removedStatus.updateVnTsData(removedEntry);

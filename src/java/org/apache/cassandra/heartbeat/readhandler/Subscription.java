@@ -8,7 +8,7 @@ import org.apache.cassandra.service.pager.Pageable;
  * @author XiGuan
  * 
  */
-public class Subscription implements Comparable<Long> {
+public class Subscription implements Comparable<Subscription> {
 	Pageable m_pageable;
 	Long m_timestamp;
 	byte[] m_lockObject;
@@ -20,8 +20,8 @@ public class Subscription implements Comparable<Long> {
 	}
 
 	@Override
-	public int compareTo(Long inTs) {
-		return m_timestamp.compareTo(inTs);
+	public int compareTo(Subscription inTs) {
+		return m_timestamp.compareTo(inTs.getTimestamp());
 	}
 
 	public Pageable getPageable() {

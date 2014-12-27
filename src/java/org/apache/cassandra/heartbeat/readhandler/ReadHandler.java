@@ -48,7 +48,7 @@ public class ReadHandler {
 					final long timestamp = bufferCell.timestamp();
 					for (Long ts : m_subscriptions.keySet()) {
 						if (ts <= timestamp) {
-							Set<Subscription> removed = new HashSet<>();
+							Set<Subscription> removed = new HashSet<Subscription>();
 							for (Subscription sub : m_subscriptions.get(ts)) {
 								// Check whether subscription has latest value
 								if (StatusMap.instance.hasLatestValue(sub.getPageable(), sub.getTimestamp())) {

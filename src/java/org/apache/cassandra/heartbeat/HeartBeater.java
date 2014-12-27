@@ -151,12 +151,12 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 			String ksName = mutation.getKeyspaceName();
 			if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName)) {
 				for (ColumnFamily cf : mutation.getColumnFamilies()) {
-					Version version = HBUtils.getMutationVersion(cf);
 					String source = HBUtils.getMutationSource(cf);
 					if (localDCName != null) {
-						if (localDCName.equalsIgnoreCase(source) && version != null) {
-							long timestamp = version.getTimestamp() / 1000;
-							updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, version.getLocalVersion(), timestamp);
+						Version vn = HBUtils.getMutationVersion(cf);
+						if (localDCName.equalsIgnoreCase(source) && vn != null) {
+							long timestamp = vn.getTimestamp() / 1000;
+							updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, vn.getLocalVersion(), timestamp);
 						}
 					} else {
 						logger.error("HeartBeater::updateStatusMsgMap, localDCName is null");

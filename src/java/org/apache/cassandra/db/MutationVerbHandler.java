@@ -59,25 +59,22 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
                 replyTo = InetAddress.getByAddress(from);
             }
             
-			Mutation copy = null;
-			if (message.payload != null && ConfReader.instance.heartbeatEnable())
-				copy = message.payload.copy();
 
             message.payload.apply();
             
             if(ConfReader.instance.heartbeatEnable()) {
-            	if(copy!=null) {
+            	if(message.payload!=null) {
             		// Update status msg map
-            		HeartBeater.instance.updateStatusMsgMap(copy);
+            		HeartBeater.instance.updateStatusMsgMap(message.payload);
             		
                 	// Update multi dc status map
                     String dcName = DatabaseDescriptor.getEndpointSnitch().getDatacenter(message.from);
-                    StatusMap.instance.removeEntry(dcName, copy);
+                    StatusMap.instance.removeEntry(dcName, message.payload);
                     
                     // Notify read subscription
-                    ReadHandler.instance.notifySubscription(copy);
+                    ReadHandler.instance.notifySubscription(message.payload);
                     
-                    if(copy.getKeyspaceName().equals("demo")){
+                    if(message.payload.getKeyspaceName().equals("demo")){
                 		logger.info("Mutation: {}", this.toString());
                 	}
             	}else {

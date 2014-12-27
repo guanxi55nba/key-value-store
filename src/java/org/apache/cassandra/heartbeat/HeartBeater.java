@@ -113,7 +113,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	}
 
 	public void start() {
-		if(enable) {
+		if (enable) {
 			logger.info("Starting up server heartbeater");
 			initializeStatusMsg();
 			logger.info("Schedule task to send out heartbeat if needed");
@@ -122,7 +122,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	}
 
 	public void stop() {
-		if(enable) {
+		if (enable) {
 			logger.info("Stop Heartbeater");
 			if (scheduledHeartBeatTask != null)
 				scheduledHeartBeatTask.cancel(false);
@@ -146,19 +146,25 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	 * @param mutation
 	 */
 	public void updateStatusMsgMap(final Mutation mutation) {
-		if(mutation!=null) {
+		if (mutation != null) {
 			ByteBuffer partitionKey = mutation.key();
 			String ksName = mutation.getKeyspaceName();
 			if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName)) {
 				for (ColumnFamily cf : mutation.getColumnFamilies()) {
 					Version version = HBUtils.getMutationVersion(cf);
-					if (version != null) {
-						long timestamp = version.getTimestamp() / 1000;
-						updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, version.getLocalVersion(), timestamp);
+					String source = HBUtils.getMutationSource(cf);
+					if (localDCName != null) {
+						if (!localDCName.equals(source) && version != null) {
+							long timestamp = version.getTimestamp() / 1000;
+							updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, version.getLocalVersion(), timestamp);
+						}
+					} else {
+						logger.error("HeartBeater::updateStatusMsgMap, localDCName is null");
 					}
+
 				}
 			}
-		}else {
+		} else {
 			logger.error("HeartBeater::updateStatusMsgMap, mutation is null");
 		}
 	}
@@ -173,9 +179,9 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 			updateStatusMsgMap(keyMetaData.getKsName(), keyMetaData.getCfName(), keyMetaData.getKey(), keyMetaData.getRow());
 		}
 	}
-	
+
 	/**
-	 * Called by {@link initializeStatusMsg} & {@link updateStatusMsgMap } 
+	 * Called by {@link initializeStatusMsg} & {@link updateStatusMsgMap }
 	 * 
 	 * @param inKSName
 	 * @param inCFName

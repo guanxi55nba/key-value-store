@@ -15,7 +15,6 @@ import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.cql3.UntypedResultSet;
 import org.apache.cassandra.cql3.UntypedResultSet.Row;
-import org.apache.cassandra.db.BufferCell;
 import org.apache.cassandra.db.Cell;
 import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.db.ColumnFamilyStore;
@@ -145,18 +144,25 @@ public class HBUtils {
 	public static Version getMutationVersion(final ColumnFamily columnFamily) {
 		Version version = null;
 		Cell cell = columnFamily.getColumn(HBUtils.cellname(HBConsts.VERSON_NO));
-		if (cell instanceof BufferCell) {
-			BufferCell bufferCell = (BufferCell) cell;
 			try {
-				long timestamp = bufferCell.timestamp();
-				ByteBuffer value = bufferCell.value().asReadOnlyBuffer();
-				long versionNo = value.getLong();
+				long timestamp = cell.timestamp();
+				long versionNo = Long.parseLong(cell.getString(columnFamily.getComparator()));
 				version = new Version(versionNo, timestamp);
 			} catch (Exception e) {
 				logger.error("getMutationVersion exception {} ", e);
 			}
-		}
 		return version;
+	}
+	
+	public static String getMutationSource(final ColumnFamily columnFamily) {
+		String source = "";
+		Cell cell = columnFamily.getColumn(HBUtils.cellname(HBConsts.SOURCE));
+		try {
+			source =cell.getString(columnFamily.getComparator());
+		} catch (Exception e) {
+			logger.error("getMutationVersion exception {} ", e);
+		}
+		return source;
 	}
 
 	private static Set<KeyMetaData> getLocalPrimaryKeys(String inKSName, String inCFName, String inPrimaryKeyName) {

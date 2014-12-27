@@ -30,6 +30,7 @@ import org.apache.cassandra.heartbeat.extra.Version;
 import org.apache.cassandra.locator.AbstractReplicationStrategy;
 import org.apache.cassandra.locator.NetworkTopologyStrategy;
 import org.apache.cassandra.locator.SimpleStrategy;
+import org.apache.cassandra.service.IReadCommand;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.service.pager.Pageable;
 import org.apache.cassandra.service.pager.Pageable.ReadCommands;
@@ -253,10 +254,13 @@ public class HBUtils {
 
 	public static Set<String> getReadCommandRelatedKeySpaceNames(Pageable inPageable) {
 		Set<String> ksNames = new HashSet<String>();
-		if (inPageable instanceof ReadCommands)
+		if (inPageable instanceof IReadCommand) {
+			ksNames.add(((IReadCommand) inPageable).getKeyspace());
+		} else if (inPageable instanceof ReadCommands) {
 			for (ReadCommand cmd : ((ReadCommands) inPageable).commands) {
 				ksNames.add(cmd.getKeyspace());
 			}
+		}
 		return ksNames;
 	}
 

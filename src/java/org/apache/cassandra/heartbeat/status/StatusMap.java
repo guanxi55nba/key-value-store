@@ -8,6 +8,7 @@ import java.util.TreeMap;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.db.Mutation;
+import org.apache.cassandra.db.RangeSliceCommand;
 import org.apache.cassandra.db.ReadCommand;
 import org.apache.cassandra.heartbeat.HBUtils;
 import org.apache.cassandra.heartbeat.StatusSynMsg;
@@ -118,39 +119,57 @@ public class StatusMap {
 		boolean hasLatestValue = true;
 		if (inPageable instanceof Pageable.ReadCommands) {
 			List<ReadCommand> readCommands = ((Pageable.ReadCommands) inPageable).commands;
-			for (ReadCommand readCommand : readCommands) {
-				String key = String.valueOf(readCommand.key.getInt(0));
-				String localDcName = DatabaseDescriptor.getLocalDataCenter();
-				Set<String> dataCenterNames = HBUtils.getDataCenterNames(readCommand.ksName);
-				dataCenterNames.remove(localDcName);
-				for (String dcName : dataCenterNames) {
-					Status status = m_currentEntries.get(key, dcName);
-					if (status == null) {
-						hasLatestValue = false;
-					} else {
-						if (status.getUpdateTs() <= inTimestamp) {
+			for (ReadCommand cmd : readCommands) {
+				String key = HBUtils.byteBufferToString(cmd.ksName, cmd.cfName, cmd.key);
+				if(!hasLatestValue(cmd.ksName, key, inTimestamp)) {
+					hasLatestValue = false;
+					break;
+				}
+			}
+		}else if(inPageable instanceof RangeSliceCommand) {
+			RangeSliceCommand cmd = (RangeSliceCommand)inPageable;
+			if(!hasLatestValue(cmd.keyspace,cmd.columnFamily,inTimestamp)) {
+				hasLatestValue = false;
+			}
+		}else if(inPageable instanceof ReadCommand) {
+			ReadCommand cmd = (ReadCommand)inPageable;
+			if(!hasLatestValue(cmd.ksName,cmd.cfName,inTimestamp));
+		}else {
+			hasLatestValue = false;
+			logger.error("StatusMap::hasLatestValue, Unkonw pageable type");
+		}
+		return hasLatestValue;
+	}
+	
+	private boolean hasLatestValue(String inKSName, String inKey, long inTimestamp) {
+		boolean hasLatestValue = true;
+		Set<String> dataCenterNames = HBUtils.getDataCenterNames(inKSName);
+		dataCenterNames.remove(DatabaseDescriptor.getLocalDataCenter());
+		for (String dcName : dataCenterNames) {
+			Status status = m_currentEntries.get(inKey, dcName);
+			if (status == null) {
+				hasLatestValue = false;
+			} else {
+				if (status.getUpdateTs() <= inTimestamp) {
+					hasLatestValue = false;
+				} else {
+					// vn: ts
+					TreeMap<Long, Long> versions = status.getVersionTsMap();
+					// if doesn't exist entry whose timestamp < inTimestamp,
+					// then row is the latest in this datacenter
+					long latestVersion = -2;
+					for (Map.Entry<Long, Long> entry : versions.entrySet()) {
+						long vn = entry.getKey();
+						long ts = entry.getValue();
+						if (ts <= inTimestamp) {
 							hasLatestValue = false;
-						} else {
-							// vn: ts
-							TreeMap<Long, Long> versions = status.getVersionTsMap();
-							// if doesn't exist entry whose timestamp <
-							// inTimestamp,
-							// then row is the latest in this datacenter
-							long latestVersion = -2;
-							for (Map.Entry<Long, Long> entry : versions.entrySet()) {
-								long vn = entry.getKey();
-								long ts = entry.getValue();
-								if (ts <= inTimestamp) {
-									hasLatestValue = false;
-									if (vn > latestVersion)
-										latestVersion = vn;
-								}
-							}
-							if (latestVersion != -2) {
-								// Wait for mutation
-								hasLatestValue = false;
-							}
+							if (vn > latestVersion)
+								latestVersion = vn;
 						}
+					}
+					if (latestVersion != -2) {
+						// Wait for mutation
+						hasLatestValue = false;
 					}
 				}
 			}

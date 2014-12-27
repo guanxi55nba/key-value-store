@@ -273,21 +273,24 @@ public class SelectStatement implements CQLStatement, MeasurableForPreparedCache
         if (parameters.isCount && pageSize <= 0)
             pageSize = DEFAULT_COUNT_PAGE_SIZE;
         
-		if (StatusMap.instance.hasLatestValue(command, now)) {
+		if (ConfReader.instance.heartbeatEnable()) {
 			Set<String> ksNames = HBUtils.getReadCommandRelatedKeySpaceNames(command);
 			Set<String> intersection = new HashSet<String>(HBUtils.SYSTEM_KEYSPACES);
-			if(!intersection.retainAll(ksNames))
-				logger.info("execute: hasLatestValue -> {}", "true");
-		} else {
-			logger.info("execute: hasLatestValue -> {}", "false");
-			
-			// sink subscription
-			synchronized (lock) {
-				try {
-					ReadHandler.instance.sinkReadHandler(command, now, lock);
-					lock.wait();
-				} catch (Exception e) {
-					logger.error("Exception: {}", e.getMessage());
+			if (intersection.retainAll(ksNames)) {
+				boolean hasLatestValue = StatusMap.instance.hasLatestValue(command, now);
+				if (hasLatestValue) {
+					logger.info("execute: hasLatestValue -> {}", "true");
+				} else {
+					logger.info("execute: hasLatestValue -> {}", "false");
+					// sink subscription
+					synchronized (lock) {
+						try {
+							ReadHandler.instance.sinkReadHandler(command, now, lock);
+							lock.wait();
+						} catch (Exception e) {
+							logger.error("Exception: {}", e.getMessage());
+						}
+					}
 				}
 			}
 		}

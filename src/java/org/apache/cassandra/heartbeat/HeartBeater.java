@@ -154,7 +154,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 					Version version = HBUtils.getMutationVersion(cf);
 					String source = HBUtils.getMutationSource(cf);
 					if (localDCName != null) {
-						if (localDCName.equals(source) && version != null) {
+						if (localDCName.equalsIgnoreCase(source) && version != null) {
 							long timestamp = version.getTimestamp() / 1000;
 							updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, version.getLocalVersion(), timestamp);
 						}

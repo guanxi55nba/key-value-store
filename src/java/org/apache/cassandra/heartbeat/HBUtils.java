@@ -142,21 +142,17 @@ public class HBUtils {
 		return datacenterNames;
 	}
 
-	public static Version getMutationVersion(ColumnFamily columnFamily) {
+	public static Version getMutationVersion(final ColumnFamily columnFamily) {
 		Version version = null;
-		Cell cell = columnFamily.getColumn(HBUtils.cellname(HBConsts.VERSON_NO));
+		ColumnFamily col = columnFamily.cloneMe();
+		Cell cell = col.getColumn(HBUtils.cellname(HBConsts.VERSON_NO));
 		if (cell instanceof BufferCell) {
 			BufferCell bufferCell = (BufferCell) cell;
 			try {
 				long timestamp = bufferCell.timestamp();
 				ByteBuffer value = bufferCell.value();
-				int capacity = value.capacity();
 				long versionNo = -1;
-				if(capacity>0){
-					versionNo = value.getLong();
-				}else{
-					logger.error("HBUtils.getMutationVersion, versionNo is null ");
-				}
+				versionNo = value.getLong();
 				version = new Version(versionNo, timestamp);
 			} catch (Exception e) {
 				logger.error("getMutationVersion exception {} ", e);

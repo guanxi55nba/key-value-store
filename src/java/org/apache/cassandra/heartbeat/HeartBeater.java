@@ -145,7 +145,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	 * 
 	 * @param mutation
 	 */
-	public void updateStatusMsgMap(Mutation mutation) {
+	public void updateStatusMsgMap(final Mutation mutation) {
 		if(mutation!=null) {
 			ByteBuffer partitionKey = mutation.key();
 			String ksName = mutation.getKeyspaceName();

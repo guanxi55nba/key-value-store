@@ -59,9 +59,9 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
                 replyTo = InetAddress.getByAddress(from);
             }
             
-            Mutation copy = null;
-            if(message.payload!=null&&ConfReader.instance.heartbeatEnable())
-            	copy = message.payload.copy();
+			Mutation copy = null;
+			if (message.payload != null && ConfReader.instance.heartbeatEnable())
+				copy = message.payload.copy();
 
             message.payload.apply();
             

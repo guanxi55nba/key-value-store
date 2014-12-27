@@ -128,7 +128,6 @@ public class HBUtils {
 		return localKeys;
 	}
 
-
 	public static Set<String> getDataCenterNames(String inKeySpaces) {
 		Set<String> datacenterNames = new HashSet<String>();
 		Keyspace keyspace = Keyspace.open(inKeySpaces);
@@ -144,23 +143,27 @@ public class HBUtils {
 	public static Version getMutationVersion(final ColumnFamily columnFamily) {
 		Version version = null;
 		Cell cell = columnFamily.getColumn(HBUtils.cellname(HBConsts.VERSON_NO));
-		try {
-			long timestamp = cell.timestamp();
-			long versionNo = cell.value().asReadOnlyBuffer().getLong();
-			version = new Version(versionNo, timestamp);
-		} catch (Exception e) {
-			logger.error("getMutationVersion exception {} ", e);
+		if (cell != null) {
+			try {
+				long timestamp = cell.timestamp();
+				long versionNo = cell.value().asReadOnlyBuffer().getLong();
+				version = new Version(versionNo, timestamp);
+			} catch (Exception e) {
+				logger.error("getMutationVersion exception {} ", e);
+			}
 		}
 		return version;
 	}
-	
+
 	public static String getMutationSource(final ColumnFamily columnFamily) {
 		String source = "";
 		Cell cell = columnFamily.getColumn(HBUtils.cellname(HBConsts.SOURCE));
-		try {
-			source =ByteBufferUtil.string(cell.value());
-		} catch (Exception e) {
-			logger.error("getMutationVersion exception {} ", e);
+		if (cell != null) {
+			try {
+				source = ByteBufferUtil.string(cell.value());
+			} catch (Exception e) {
+				logger.error("getMutationVersion exception {} ", e);
+			}
 		}
 		return source;
 	}

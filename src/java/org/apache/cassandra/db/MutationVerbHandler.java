@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 
 import org.apache.cassandra.config.DatabaseDescriptor;
-import org.apache.cassandra.heartbeat.HeartBeater;
 import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
 import org.apache.cassandra.heartbeat.status.StatusMap;
 import org.apache.cassandra.io.util.FastByteArrayInputStream;
@@ -64,9 +63,6 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
             
             if(ConfReader.instance.heartbeatEnable()) {
             	if(message.payload!=null) {
-            		// Update status msg map
-            		HeartBeater.instance.updateStatusMsgMap(message.payload);
-            		
                 	// Update multi dc status map
                     String dcName = DatabaseDescriptor.getEndpointSnitch().getDatacenter(message.from);
                     StatusMap.instance.removeEntry(dcName, message.payload);

@@ -34,7 +34,6 @@ import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.db.composites.CellName;
 import org.apache.cassandra.db.composites.Composite;
 import org.apache.cassandra.heartbeat.HeartBeater;
-import org.apache.cassandra.heartbeat.extra.HBConsts;
 import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.net.MessageOut;
@@ -220,6 +219,10 @@ public class Mutation implements IMutation
     {
         Keyspace ks = Keyspace.open(keyspaceName);       
         ks.apply(this, ks.metadata.durableWrites);
+        
+        // Update status msg map
+        if(ConfReader.instance.heartbeatEnable()) 
+        	HeartBeater.instance.updateStatusMsgMap(this);
     }
 
     public void applyUnsafe()

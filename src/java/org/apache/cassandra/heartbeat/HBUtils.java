@@ -144,13 +144,13 @@ public class HBUtils {
 	public static Version getMutationVersion(final ColumnFamily columnFamily) {
 		Version version = null;
 		Cell cell = columnFamily.getColumn(HBUtils.cellname(HBConsts.VERSON_NO));
-			try {
-				long timestamp = cell.timestamp();
-				long versionNo = Long.parseLong(cell.getString(columnFamily.getComparator()));
-				version = new Version(versionNo, timestamp);
-			} catch (Exception e) {
-				logger.error("getMutationVersion exception {} ", e);
-			}
+		try {
+			long timestamp = cell.timestamp();
+			long versionNo = cell.value().asReadOnlyBuffer().getLong();
+			version = new Version(versionNo, timestamp);
+		} catch (Exception e) {
+			logger.error("getMutationVersion exception {} ", e);
+		}
 		return version;
 	}
 	
@@ -158,7 +158,7 @@ public class HBUtils {
 		String source = "";
 		Cell cell = columnFamily.getColumn(HBUtils.cellname(HBConsts.SOURCE));
 		try {
-			source =cell.getString(columnFamily.getComparator());
+			source =cell.value().asReadOnlyBuffer().asCharBuffer().toString();
 		} catch (Exception e) {
 			logger.error("getMutationVersion exception {} ", e);
 		}

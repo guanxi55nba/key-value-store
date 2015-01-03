@@ -13,6 +13,7 @@ public class ConfReader {
 	public static Properties configuration;
 	public static Properties tranProperties;
 	private boolean heartbeatEnable = false;
+	private String ksName = "";
 	public static final ConfReader instance = new ConfReader();
 
 	private ConfReader() {
@@ -37,7 +38,9 @@ public class ConfReader {
 	}
 
 	public String getKeySpaceName() {
-		return configuration.getProperty("keyspace.name");
+		if(ksName.isEmpty())
+			ksName = configuration.getProperty("keyspace.name");
+		return ksName;
 	}
 
 	public String getColumnFamilyName() {

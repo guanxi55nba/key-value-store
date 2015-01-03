@@ -275,10 +275,15 @@ public class SelectStatement implements CQLStatement, MeasurableForPreparedCache
         
 		if (ConfReader.instance.heartbeatEnable()) {
 			Set<String> ksNames = HBUtils.getReadCommandRelatedKeySpaceNames(command);
-			Set<String> intersection = new HashSet<String>(HBUtils.SYSTEM_KEYSPACES);
-			if (intersection.retainAll(ksNames)) {
-				boolean hasLatestValue = StatusMap.instance.hasLatestValue(command, now);
-				if (hasLatestValue) {
+			boolean superset = true;
+			for (String ks : ksNames) {
+				if (!HBUtils.SYSTEM_KEYSPACES.contains(ks)) {
+					superset = false;
+					break;
+				}
+			}
+			if (!superset) {
+				if (StatusMap.instance.hasLatestValue(command, now)) {
 					logger.info("execute: hasLatestValue -> {}", "true");
 				} else {
 					logger.info("execute: hasLatestValue -> {}", "false");

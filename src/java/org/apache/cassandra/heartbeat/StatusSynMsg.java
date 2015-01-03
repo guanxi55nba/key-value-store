@@ -3,7 +3,6 @@ package org.apache.cassandra.heartbeat;
 import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.Date;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -85,7 +84,7 @@ public class StatusSynMsg {
 				sb.append(entry.getKey());
 				sb.append(":");
 				sb.append("'");
-				sb.append(DateFormatUtils.format(new Date(entry.getValue()), "yyyy-MM-dd HH:mm:ss"));
+				sb.append(DateFormatUtils.format(entry.getValue(), "yyyy-MM-dd HH:mm:ss"));
 				sb.append("'");
 				sb.append(",");
 			}

@@ -1228,41 +1228,6 @@ public class StorageProxy implements StorageProxyMBean
         
         return rows;
     }
-    
-	public static List<Row> readLocal(List<ReadCommand> commands) {
-		long start = System.nanoTime();
-		List<Row> rows = null;
-		try {
-			
-			for (ReadCommand cmd : commands) {
-				// Get all the dc name
-				Set<String> dcNames = HBUtils.getDataCenterNames(cmd.getKeyspace());
-
-				// Form a local-one ReadCommd to get the latest value in each data center
-				for (String dcName : dcNames) {
-					ReadCommand dcCommond = null;
-
-				}
-
-				// Check status map to see whether could return
-
-				// If not, create a read handler and put it in the read handler pool
-			}
-			rows = fetchRows(commands, ConsistencyLevel.LOCAL_ONE);
-		} catch (UnavailableException e) {
-			readMetrics.unavailables.mark();
-			ClientRequestMetrics.readUnavailables.inc();
-			logger.info("readLocal ReadTimeoutException", e);
-		} catch (ReadTimeoutException e) {
-			readMetrics.timeouts.mark();
-			ClientRequestMetrics.readTimeouts.inc();
-			logger.info("readLocal ReadTimeoutException", e);
-		} finally {
-			long latency = System.nanoTime() - start;
-			logger.info("readLocal latency {}", latency);
-		}
-		return rows;
-	}
 
     /**
      * This function executes local and remote reads, and blocks for the results:

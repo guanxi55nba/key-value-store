@@ -13,7 +13,9 @@ import org.apache.cassandra.db.ReadCommand;
 import org.apache.cassandra.heartbeat.HBUtils;
 import org.apache.cassandra.heartbeat.StatusSynMsg;
 import org.apache.cassandra.heartbeat.extra.Version;
+import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
 import org.apache.cassandra.service.pager.Pageable;
+import org.apache.cassandra.utils.keyvaluestore.ConfReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,6 +78,9 @@ public class StatusMap {
 				} else {
 					status.updateVnTsData(vn_ts);
 				}
+				
+				// Notify sinked read handler
+				ReadHandler.instance.notifySubscription(key, entry.getValue());
 			}
 		} else {
 			logger.error("inSynMsg is null");
@@ -127,13 +132,16 @@ public class StatusMap {
 				}
 			}
 		}else if(inPageable instanceof RangeSliceCommand) {
-			RangeSliceCommand cmd = (RangeSliceCommand)inPageable;
-			if(!hasLatestValue(cmd.keyspace,cmd.columnFamily,inTimestamp)) {
-				hasLatestValue = false;
-			}
+//			RangeSliceCommand cmd = (RangeSliceCommand)inPageable;
+//			if(!hasLatestValue(cmd.keyspace,cmd.keyRange,inTimestamp)) {
+//				hasLatestValue = false;
+//			}
 		}else if(inPageable instanceof ReadCommand) {
 			ReadCommand cmd = (ReadCommand)inPageable;
-			if(!hasLatestValue(cmd.ksName,cmd.cfName,inTimestamp));
+			String key = HBUtils.byteBufferToString(cmd.ksName, cmd.cfName, cmd.key);
+			if(!hasLatestValue(cmd.ksName,cmd.cfName,inTimestamp)) {
+				hasLatestValue = false;
+			}
 		}else {
 			hasLatestValue = false;
 			logger.error("StatusMap::hasLatestValue, Unkonw pageable type");

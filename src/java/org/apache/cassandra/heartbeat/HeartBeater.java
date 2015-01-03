@@ -103,7 +103,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 					statusSynMsg.updateTimestamp(sendTime);
 					MessageOut<StatusSynMsg> finalMsg = new MessageOut<StatusSynMsg>(MessagingService.Verb.HEARTBEAT_DIGEST, statusSynMsg, StatusSynMsg.serializer);
 					MessagingService.instance().sendOneWay(finalMsg, destination);
-					logger.info("send out status msg to {} with msg {}", destination, statusSynMsg);
+					logger.info("Send out status msg to {} with msg {}", destination, statusSynMsg);
 				}
 			}
 

@@ -31,8 +31,6 @@ public class HeartBeatVerbHandler implements IVerbHandler<StatusSynMsg> {
 
 			// Update multi dc status map
 			StatusMap.instance.updateStatusMap(dcName, message.payload);
-
-			// Check pending read
 		}
 	}
 

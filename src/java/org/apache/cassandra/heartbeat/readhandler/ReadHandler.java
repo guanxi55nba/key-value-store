@@ -3,7 +3,6 @@ package org.apache.cassandra.heartbeat.readhandler;
 import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -67,28 +66,19 @@ public class ReadHandler {
 	 * @param inMsg
 	 */
 	public void notifySubscription(StatusSynMsg inMsg) {
-		TreeMap<String, TreeMap<Long, Long>> data = inMsg.getData();
-		for (Map.Entry<String, TreeMap<Long, Long>> entry : data.entrySet()) {
-			notifySubscription( entry.getKey(), entry.getValue());
-		}
-	}
-	
-	public void notifySubscription(String key, TreeMap<Long,Long> versionToTs ) {
 		String ksName = ConfReader.instance.getKeySpaceName();
-		Long latestTs = -1l;
-		for (Map.Entry<Long, Long> item : versionToTs.entrySet()) {
-			Long ts = item.getValue();
-			if(ts>latestTs)
-				latestTs = ts;
+		TreeMap<String, TreeMap<Long, Long>> data = inMsg.getData();
+		for (String key : data.keySet()) {
+			notifySubscription(ksName, key, inMsg.getTimestamp());
 		}
-		notifySubscription(ksName, key, latestTs);
 	}
 	
-	private void notifySubscription(String ksName, String key, final long timestamp) {
+	public void notifySubscription(String ksName, String key, final long timestamp) {
 		TreeMultimap<Long, Subscription> subMap = m_subscription.get(ksName, key);
 		if (subMap != null) {
 			for (Long ts : subMap.keySet()) {
 				if (ts <= timestamp) {
+					logger.info("ReadHandler.notifySubscription: ts<=timestamp");
 					Set<Subscription> removed = new HashSet<Subscription>();
 					for (Subscription sub : subMap.get(ts)) {
 						// Check whether subscription has latest value

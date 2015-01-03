@@ -80,7 +80,8 @@ public class StatusMap {
 				}
 				
 				// Notify sinked read handler
-				ReadHandler.instance.notifySubscription(key, entry.getValue());
+				String ksName = ConfReader.instance.getKeySpaceName();
+				ReadHandler.instance.notifySubscription(ksName, key, inSynMsg.getTimestamp());
 			}
 		} else {
 			logger.error("inSynMsg is null");

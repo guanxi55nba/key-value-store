@@ -79,14 +79,6 @@ public class HBUtils {
 		return row;
 	}
 
-	/**
-	 * Get current used key space
-	 * 
-	 * @return key space name
-	 */
-	public static String getKeySpaceName() {
-		return ConfReader.instance.getKeySpaceName();
-	}
 
 	public static String getColumnFamilyName() {
 		return ConfReader.instance.getColumnFamilyName();

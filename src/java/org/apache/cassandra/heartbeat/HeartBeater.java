@@ -184,7 +184,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	}
 
 	/**
-	 * Called by {@link initializeStatusMsg} & {@link updateStatusMsgMap }
+	 * Called by {@link #initializeStatusMsg} & {@link #updateStatusMsgMap }
 	 * 
 	 * @param inKSName
 	 * @param inCFName

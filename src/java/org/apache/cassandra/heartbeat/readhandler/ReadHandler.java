@@ -83,7 +83,9 @@ public class ReadHandler {
 					for (Subscription sub : subMap.get(ts)) {
 						// Check whether subscription has latest value
 						if (StatusMap.instance.hasLatestValue(sub.getPageable(), sub.getTimestamp())) {
-							sub.getLockObject().notify();
+							synchronized (sub.getLockObject()) {
+								sub.getLockObject().notify();
+							}
 							removed.add(sub);
 						}
 					}

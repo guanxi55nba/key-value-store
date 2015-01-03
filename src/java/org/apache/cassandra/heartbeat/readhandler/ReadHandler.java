@@ -105,6 +105,7 @@ public class ReadHandler {
 					TreeMultimap<Long, Subscription> subMap = m_subscription.get(cmd.ksName, key);
 					if (subMap == null) {
 						subMap = TreeMultimap.create();
+						m_subscription.put(cmd.ksName, key, subMap);
 					}
 					subMap.put(inTimestamp, subscription);
 				}
@@ -116,6 +117,7 @@ public class ReadHandler {
 				TreeMultimap<Long, Subscription> subMap = m_subscription.get(cmd.ksName, key);
 				if (subMap == null) {
 					subMap = TreeMultimap.create();
+					m_subscription.put(cmd.ksName, key, subMap);
 				}
 				subMap.put(inTimestamp, subscription);
 			} else {

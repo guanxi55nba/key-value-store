@@ -77,6 +77,7 @@ public class StatusMap {
 					m_currentEntries.put(key, inDCName, status);
 				} else {
 					status.updateVnTsData(vn_ts);
+					status.setUpdateTs(inSynMsg.getTimestamp());
 				}
 				
 				// Notify sinked read handler
@@ -121,26 +122,28 @@ public class StatusMap {
 		}
 	}
 
+	/**
+	 * @param inPageable
+	 * @param inTimestamp
+	 * @return
+	 */
 	public boolean hasLatestValue(Pageable inPageable, long inTimestamp) {
 		boolean hasLatestValue = true;
 		if (inPageable instanceof Pageable.ReadCommands) {
 			List<ReadCommand> readCommands = ((Pageable.ReadCommands) inPageable).commands;
 			for (ReadCommand cmd : readCommands) {
 				String key = HBUtils.byteBufferToString(cmd.ksName, cmd.cfName, cmd.key);
-				if(!hasLatestValue(cmd.ksName, key, inTimestamp)) {
+				if(!hasLatestValueImpl(cmd.ksName, key, inTimestamp)) {
 					hasLatestValue = false;
 					break;
 				}
 			}
 		}else if(inPageable instanceof RangeSliceCommand) {
-//			RangeSliceCommand cmd = (RangeSliceCommand)inPageable;
-//			if(!hasLatestValue(cmd.keyspace,cmd.keyRange,inTimestamp)) {
-//				hasLatestValue = false;
-//			}
+			logger.error("StatusMap::hasLatestValue, RangeSliceCommand doesn't support");
 		}else if(inPageable instanceof ReadCommand) {
 			ReadCommand cmd = (ReadCommand)inPageable;
 			String key = HBUtils.byteBufferToString(cmd.ksName, cmd.cfName, cmd.key);
-			if(!hasLatestValue(cmd.ksName,cmd.cfName,inTimestamp)) {
+			if(!hasLatestValueImpl(cmd.ksName,key,inTimestamp)) {
 				hasLatestValue = false;
 			}
 		}else {
@@ -150,7 +153,7 @@ public class StatusMap {
 		return hasLatestValue;
 	}
 	
-	private boolean hasLatestValue(String inKSName, String inKey, long inTimestamp) {
+	private boolean hasLatestValueImpl(String inKSName, String inKey, long inTimestamp) {
 		boolean hasLatestValue = true;
 		Set<String> dataCenterNames = HBUtils.getDataCenterNames(inKSName);
 		dataCenterNames.remove(DatabaseDescriptor.getLocalDataCenter());
@@ -158,9 +161,12 @@ public class StatusMap {
 			Status status = m_currentEntries.get(inKey, dcName);
 			if (status == null) {
 				hasLatestValue = false;
+				logger.info("StatusMap::hasLatestValueImpl, hasLatestValue == false, status == null");
 			} else {
 				if (status.getUpdateTs() <= inTimestamp) {
 					hasLatestValue = false;
+					logger.info("StatusMap::hasLatestValueImpl, {}, update ts {} <= inTimestamp {}", hasLatestValue, 
+							HBUtils.dateFormat(status.getUpdateTs()), HBUtils.dateFormat(inTimestamp) );
 				} else {
 					// vn: ts
 					TreeMap<Long, Long> versions = status.getVersionTsMap();
@@ -179,6 +185,7 @@ public class StatusMap {
 					if (latestVersion != -2) {
 						// Wait for mutation
 						hasLatestValue = false;
+						logger.info("StatusMap::hasLatestValueImpl, hasLatestValue == false, latestVersion == ", latestVersion);
 					}
 				}
 			}

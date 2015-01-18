@@ -292,6 +292,7 @@ public class SelectStatement implements CQLStatement, MeasurableForPreparedCache
 						try {
 							ReadHandler.instance.sinkReadHandler(command, now, lock);
 							lock.wait();
+							logger.info("[WaitingThread]: Successfully notified!");
 						} catch (Exception e) {
 							logger.error("Exception: {}", e.getMessage());
 						}

@@ -10,7 +10,6 @@ import org.apache.cassandra.db.TypeSizes;
 import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.commons.lang3.SerializationUtils;
-import org.apache.commons.lang3.time.DateFormatUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,7 +83,7 @@ public class StatusSynMsg {
 				sb.append(entry.getKey());
 				sb.append(":");
 				sb.append("'");
-				sb.append(DateFormatUtils.format(entry.getValue(), "yyyy-MM-dd HH:mm:ss"));
+				sb.append(HBUtils.dateFormat(entry.getValue()));
 				sb.append("'");
 				sb.append(",");
 			}
@@ -95,7 +94,7 @@ public class StatusSynMsg {
 			sb.append(", ");
 		}
 		sb.append("TS : ");
-		sb.append(DateFormatUtils.format(timestamp, "yyyy-MM-dd HH:mm:ss"));
+		sb.append(HBUtils.dateFormat(timestamp));
 		sb.append(" }");
 		return sb.toString();
 	}

@@ -18,29 +18,68 @@
 package org.apache.cassandra.cql3.statements;
 
 import java.nio.ByteBuffer;
-import java.util.*;
-
-import com.google.common.base.Function;
-import com.google.common.collect.Iterables;
-import org.github.jamm.MemoryMeter;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.ColumnDefinition;
-import org.apache.cassandra.cql3.*;
-import org.apache.cassandra.db.*;
+import org.apache.cassandra.config.DatabaseDescriptor;
+import org.apache.cassandra.cql3.Attributes;
+import org.apache.cassandra.cql3.CFName;
+import org.apache.cassandra.cql3.CQL3Row;
+import org.apache.cassandra.cql3.CQLStatement;
+import org.apache.cassandra.cql3.ColumnCondition;
+import org.apache.cassandra.cql3.ColumnIdentifier;
+import org.apache.cassandra.cql3.ColumnSpecification;
+import org.apache.cassandra.cql3.Lists;
+import org.apache.cassandra.cql3.MeasurableForPreparedCache;
+import org.apache.cassandra.cql3.Operation;
+import org.apache.cassandra.cql3.QueryOptions;
+import org.apache.cassandra.cql3.Relation;
+import org.apache.cassandra.cql3.ResultSet;
+import org.apache.cassandra.cql3.SingleColumnRelation;
+import org.apache.cassandra.cql3.Term;
+import org.apache.cassandra.cql3.UpdateParameters;
+import org.apache.cassandra.cql3.VariableSpecifications;
+import org.apache.cassandra.db.ArrayBackedSortedColumns;
+import org.apache.cassandra.db.ColumnFamily;
+import org.apache.cassandra.db.ConsistencyLevel;
+import org.apache.cassandra.db.CounterMutation;
+import org.apache.cassandra.db.IMutation;
+import org.apache.cassandra.db.Mutation;
+import org.apache.cassandra.db.ReadCommand;
+import org.apache.cassandra.db.Row;
+import org.apache.cassandra.db.SliceFromReadCommand;
 import org.apache.cassandra.db.composites.CBuilder;
 import org.apache.cassandra.db.composites.Composite;
 import org.apache.cassandra.db.filter.ColumnSlice;
 import org.apache.cassandra.db.filter.SliceQueryFilter;
 import org.apache.cassandra.db.marshal.BooleanType;
-import org.apache.cassandra.exceptions.*;
+import org.apache.cassandra.exceptions.InvalidRequestException;
+import org.apache.cassandra.exceptions.RequestExecutionException;
+import org.apache.cassandra.exceptions.RequestValidationException;
+import org.apache.cassandra.exceptions.UnauthorizedException;
+import org.apache.cassandra.heartbeat.HBUtils;
+import org.apache.cassandra.heartbeat.HeartBeater;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.QueryState;
 import org.apache.cassandra.service.StorageProxy;
 import org.apache.cassandra.thrift.ThriftValidation;
 import org.apache.cassandra.transport.messages.ResultMessage;
 import org.apache.cassandra.utils.Pair;
+import org.apache.cassandra.utils.keyvaluestore.ConfReader;
+import org.github.jamm.MemoryMeter;
+
+import com.google.common.base.Function;
+import com.google.common.collect.Iterables;
 
 /*
  * Abstract parent class of individual modifications, i.e. INSERT, UPDATE and DELETE.
@@ -658,6 +697,13 @@ public abstract class ModificationStatement implements CQLStatement, MeasurableF
             ThriftValidation.validateKey(cfm, key);
             ColumnFamily cf = ArrayBackedSortedColumns.factory.create(cfm);
             addUpdateForKey(cf, key, clusteringPrefix, params);
+			if (ConfReader.instance.heartbeatEnable()) {
+				// add version no and local dc
+				long vn = HeartBeater.instance.getKeyVersionNo(cf.metadata().ksName, key);
+				String dcName = DatabaseDescriptor.getLocalDataCenter();
+				HBUtils.addLocalDcAndVersionNoInUpdate(params, clusteringPrefix, cf, vn, dcName);
+			}
+				
             Mutation mut = new Mutation(cfm.ksName, key, cf);
 
             mutations.add(isCounter() ? new CounterMutation(mut, options.getConsistency()) : mut);

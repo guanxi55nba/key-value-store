@@ -15,6 +15,7 @@ import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.cql3.UntypedResultSet;
 import org.apache.cassandra.cql3.UntypedResultSet.Row;
+import org.apache.cassandra.cql3.UpdateParameters;
 import org.apache.cassandra.db.Cell;
 import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.db.ColumnFamilyStore;
@@ -23,7 +24,9 @@ import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.db.ReadCommand;
 import org.apache.cassandra.db.composites.CellName;
 import org.apache.cassandra.db.composites.CellNames;
+import org.apache.cassandra.db.composites.Composite;
 import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.exceptions.RequestExecutionException;
 import org.apache.cassandra.heartbeat.extra.HBConsts;
 import org.apache.cassandra.heartbeat.extra.Version;
@@ -36,6 +39,7 @@ import org.apache.cassandra.service.pager.Pageable;
 import org.apache.cassandra.service.pager.Pageable.ReadCommands;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.keyvaluestore.ConfReader;
+import org.apache.commons.lang3.time.DateFormatUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,7 +82,6 @@ public class HBUtils {
 		}
 		return row;
 	}
-
 
 	public static String getColumnFamilyName() {
 		return ConfReader.instance.getColumnFamilyName();
@@ -269,4 +272,28 @@ public class HBUtils {
 			bbs[i] = ByteBufferUtil.bytes(strs[i]);
 		return cellname(bbs);
 	}
+
+	public static String dateFormat(long inTs) {
+		return DateFormatUtils.format(inTs, "yyyy-MM-dd HH:mm:ss");
+	}
+
+	public static void addLocalDcAndVersionNoInUpdate(UpdateParameters params, Composite clusteringPrefix, ColumnFamily cf, long vn, String dcName) throws InvalidRequestException {
+		String ksName = cf.metadata().ksName;
+		if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName)) {
+			// Add version no
+			ByteBuffer vnColName = ByteBufferUtil.bytes(HBConsts.VERSON_NO);
+			ColumnDefinition vnColDef = cf.metadata().getColumnDefinition(vnColName);
+			CellName vnCellName = cf.getComparator().create(clusteringPrefix, vnColDef);
+			ByteBuffer vnCellValue = ByteBufferUtil.bytes(vn);
+			cf.addColumn(params.makeColumn(vnCellName, vnCellValue));
+
+			// Add local dc
+			ByteBuffer dcColName = ByteBufferUtil.bytes(HBConsts.SOURCE);
+			ColumnDefinition dcColDef = cf.metadata().getColumnDefinition(dcColName);
+			CellName dcCellName = cf.getComparator().create(clusteringPrefix, dcColDef);
+			ByteBuffer dcCellValue = ByteBufferUtil.bytes(dcName);
+			cf.addColumn(params.makeColumn(dcCellName, dcCellValue));
+		}
+	}
+
 }

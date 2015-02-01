@@ -3,7 +3,9 @@ package org.apache.cassandra.heartbeat;
 import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.TreeMap;
 
 import org.apache.cassandra.db.TypeSizes;
@@ -75,7 +77,9 @@ public class StatusSynMsg {
 		sb.append("DCName: ");
 		sb.append(dcName);
 		sb.append(", ");
-		for (Map.Entry<String, TreeMap<Long, Long>> dataEntry : m_data.entrySet()) {
+		Iterator<Entry<String, TreeMap<Long, Long>>> iterator = m_data.entrySet().iterator();
+		while (iterator.hasNext()) {
+			Entry<String, TreeMap<Long, Long>> dataEntry = iterator.next();
 			sb.append(dataEntry.getKey());
 			sb.append(":");
 			sb.append("[ ");

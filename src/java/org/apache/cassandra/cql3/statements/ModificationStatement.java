@@ -77,6 +77,8 @@ import org.apache.cassandra.transport.messages.ResultMessage;
 import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.keyvaluestore.ConfReader;
 import org.github.jamm.MemoryMeter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
@@ -86,6 +88,7 @@ import com.google.common.collect.Iterables;
  */
 public abstract class ModificationStatement implements CQLStatement, MeasurableForPreparedCache
 {
+	private static final Logger logger = LoggerFactory.getLogger(ModificationStatement.class);
     private static final ColumnIdentifier CAS_RESULT_COLUMN = new ColumnIdentifier("[applied]", false);
 
     public static enum StatementType { INSERT, UPDATE, DELETE }
@@ -700,6 +703,7 @@ public abstract class ModificationStatement implements CQLStatement, MeasurableF
 			if (ConfReader.instance.heartbeatEnable()) {
 				// add version no and local dc
 				long vn = HeartBeater.instance.getKeyVersionNo(cf.metadata().ksName, key);
+				//logger.info("getMutations: vn -> {}", vn);
 				String dcName = DatabaseDescriptor.getLocalDataCenter();
 				HBUtils.addLocalDcAndVersionNoInUpdate(params, clusteringPrefix, cf, vn, dcName);
 			}

@@ -277,6 +277,16 @@ public class HBUtils {
 		return DateFormatUtils.format(inTs, "yyyy-MM-dd HH:mm:ss");
 	}
 
+	/**
+	 * Add local dc name and add local version number if it doesn't exist
+	 * 
+	 * @param params
+	 * @param clusteringPrefix
+	 * @param cf
+	 * @param vn
+	 * @param dcName
+	 * @throws InvalidRequestException
+	 */
 	public static void addLocalDcAndVersionNoInUpdate(UpdateParameters params, Composite clusteringPrefix, ColumnFamily cf, long vn, String dcName) throws InvalidRequestException {
 		String ksName = cf.metadata().ksName;
 		if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName)) {
@@ -284,15 +294,19 @@ public class HBUtils {
 			ByteBuffer vnColName = ByteBufferUtil.bytes(HBConsts.VERSON_NO);
 			ColumnDefinition vnColDef = cf.metadata().getColumnDefinition(vnColName);
 			CellName vnCellName = cf.getComparator().create(clusteringPrefix, vnColDef);
-			ByteBuffer vnCellValue = ByteBufferUtil.bytes(vn);
-			cf.addColumn(params.makeColumn(vnCellName, vnCellValue));
+			if(cf.getColumn(vnCellName)==null) {
+				ByteBuffer vnCellValue = ByteBufferUtil.bytes(vn);
+				cf.addColumn(params.makeColumn(vnCellName, vnCellValue));
+			}
 
 			// Add local dc
 			ByteBuffer dcColName = ByteBufferUtil.bytes(HBConsts.SOURCE);
 			ColumnDefinition dcColDef = cf.metadata().getColumnDefinition(dcColName);
 			CellName dcCellName = cf.getComparator().create(clusteringPrefix, dcColDef);
-			ByteBuffer dcCellValue = ByteBufferUtil.bytes(dcName);
-			cf.addColumn(params.makeColumn(dcCellName, dcCellValue));
+			if(cf.getColumn(dcCellName)==null) {
+				ByteBuffer dcCellValue = ByteBufferUtil.bytes(dcName);
+				cf.addColumn(params.makeColumn(dcCellName, dcCellValue));
+			}
 		}
 	}
 

@@ -60,11 +60,13 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	 */
 	ConcurrentHashMap<InetAddress, StatusSynMsg> m_statusMsgMap = new ConcurrentHashMap<InetAddress, StatusSynMsg>();
 	private TreeBasedTable<String, ByteBuffer, AtomicLong> m_versionMaps = TreeBasedTable.create();
+	private byte[] m_versionMaplock = new byte[0];
 	private ScheduledFuture<?> scheduledHeartBeatTask;
 	private AtomicInteger version = new AtomicInteger(0);
 	public static final HeartBeater instance = new HeartBeater();
 	private String localDCName = DatabaseDescriptor.getLocalDataCenter();
 	private boolean enable = ConfReader.instance.heartbeatEnable();
+	
 
 	private HeartBeater() {
 		if (enable) {
@@ -176,12 +178,14 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 
 	public long getKeyVersionNo(String inKSName, ByteBuffer inKey) {
 		long version = -1;
-		AtomicLong atomicLong = m_versionMaps.get(inKSName, inKey);
-		if (atomicLong == null) {
-			m_versionMaps.put(inKSName, inKey, new AtomicLong(0));
-			version = 0;
-		} else {
-			version = atomicLong.incrementAndGet();
+		synchronized (m_versionMaplock) {
+			AtomicLong atomicLong = m_versionMaps.get(inKSName, inKey);
+			if (atomicLong == null) {
+				m_versionMaps.put(inKSName, inKey, new AtomicLong(0));
+				version = 0;
+			} else {
+				version = atomicLong.incrementAndGet();
+			}
 		}
 		return version;
 	}

@@ -287,7 +287,7 @@ public class HBUtils {
 	 * @param dcName
 	 * @throws InvalidRequestException
 	 */
-	public static void addLocalDcAndVersionNoInUpdate(UpdateParameters params, Composite clusteringPrefix, ColumnFamily cf, long vn, String dcName) throws InvalidRequestException {
+	public static void addVnAndSourceInUpdate(UpdateParameters params, Composite clusteringPrefix, ColumnFamily cf, long vn, String dcName) throws InvalidRequestException {
 		String ksName = cf.metadata().ksName;
 		if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName)) {
 			// Add version no
@@ -308,6 +308,10 @@ public class HBUtils {
 				cf.addColumn(params.makeColumn(dcCellName, dcCellValue));
 			}
 		}
+	}
+	
+	public static boolean isReplicaNode(String inKeySpaceName, ByteBuffer key) {
+		return getReplicaList(inKeySpaceName, key).contains(DatabaseDescriptor.getListenAddress());
 	}
 
 }

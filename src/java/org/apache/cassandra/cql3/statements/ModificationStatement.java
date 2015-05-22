@@ -69,6 +69,7 @@ import org.apache.cassandra.exceptions.RequestValidationException;
 import org.apache.cassandra.exceptions.UnauthorizedException;
 import org.apache.cassandra.heartbeat.HBUtils;
 import org.apache.cassandra.heartbeat.HeartBeater;
+import org.apache.cassandra.heartbeat.extra.HBConsts;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.QueryState;
 import org.apache.cassandra.service.StorageProxy;
@@ -701,11 +702,18 @@ public abstract class ModificationStatement implements CQLStatement, MeasurableF
             ColumnFamily cf = ArrayBackedSortedColumns.factory.create(cfm);
             addUpdateForKey(cf, key, clusteringPrefix, params);
 			if (ConfReader.instance.heartbeatEnable()) {
-				// add version no and local dc
-				long vn = HeartBeater.instance.getKeyVersionNo(cf.metadata().ksName, key);
-				//logger.info("getMutations: vn -> {}", vn);
-				String dcName = DatabaseDescriptor.getLocalDataCenter();
-				HBUtils.addLocalDcAndVersionNoInUpdate(params, clusteringPrefix, cf, vn, dcName);
+				String ksName = cf.metadata().ksName;
+				long vn = -1;
+				boolean isReplicaNode = HBUtils.isReplicaNode(ksName, key);
+				String sourceName = DatabaseDescriptor.getListenAddress().toString();
+				if (isReplicaNode) {
+					// add version no and local dc
+					vn = HeartBeater.instance.getKeyVersionNo(ksName, key);
+					// logger.info("getMutations: vn -> {}", vn);
+				} else {
+					sourceName += HBConsts.COORDINATOR;
+				}
+				HBUtils.addVnAndSourceInUpdate(params, clusteringPrefix, cf, vn, sourceName);
 			}
 				
             Mutation mut = new Mutation(cfm.ksName, key, cf);

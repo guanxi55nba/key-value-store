@@ -9,4 +9,5 @@ public class HBConsts {
 	public static final String KEY_ID = "id";
 	public static final String CF_NAME = ConfReader.instance.getColumnFamilyName();
 	public static final String VERSION_WRITE_TIME = "writetime(" + VERSON_NO + ")";
+	public static final String COORDINATOR = "C";
 }

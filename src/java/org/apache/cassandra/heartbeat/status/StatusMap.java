@@ -176,11 +176,13 @@ public class StatusMap {
 					long latestVersion = -2;
 					for (Map.Entry<Long, Long> entry : versions.entrySet()) {
 						long vn = entry.getKey();
-						long ts = entry.getValue();
-						if (ts <= inTimestamp) {
-							hasLatestValue = false;
-							if (vn > latestVersion)
-								latestVersion = vn;
+						if(vn>=0){
+							long ts = entry.getValue();
+							if (ts <= inTimestamp) {
+								hasLatestValue = false;
+								if (vn > latestVersion)
+									latestVersion = vn;
+							}
 						}
 					}
 					if (latestVersion != -2) {

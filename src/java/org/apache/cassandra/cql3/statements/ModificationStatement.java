@@ -705,7 +705,7 @@ public abstract class ModificationStatement implements CQLStatement, MeasurableF
 				String ksName = cf.metadata().ksName;
 				long vn = -1;
 				boolean isReplicaNode = HBUtils.isReplicaNode(ksName, key);
-				String sourceName = DatabaseDescriptor.getListenAddress().toString();
+				String sourceName = DatabaseDescriptor.getListenAddress().getHostAddress();
 				if (isReplicaNode) {
 					// add version no and local dc
 					vn = HeartBeater.instance.getKeyVersionNo(ksName, key);

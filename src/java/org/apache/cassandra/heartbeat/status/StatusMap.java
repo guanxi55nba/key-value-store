@@ -134,7 +134,8 @@ public class StatusMap {
 		if (inPageable instanceof Pageable.ReadCommands) {
 			List<ReadCommand> readCommands = ((Pageable.ReadCommands) inPageable).commands;
 			for (ReadCommand cmd : readCommands) {
-				if(!hasLatestValueImpl(cmd.ksName, cmd.key, inTimestamp)) {
+				String key = HBUtils.byteBufferToString(cmd.ksName, cmd.cfName, cmd.key);
+				if(!hasLatestValueImpl(cmd.ksName, key,cmd.key, inTimestamp)) {
 					hasLatestValue = false;
 					break;
 				}
@@ -143,7 +144,8 @@ public class StatusMap {
 			logger.error("StatusMap::hasLatestValue, RangeSliceCommand doesn't support");
 		}else if(inPageable instanceof ReadCommand) {
 			ReadCommand cmd = (ReadCommand)inPageable;
-			if(!hasLatestValueImpl(cmd.ksName, cmd.key, inTimestamp)) {
+			String key = HBUtils.byteBufferToString(cmd.ksName, cmd.cfName, cmd.key);
+			if(!hasLatestValueImpl(cmd.ksName, key, cmd.key, inTimestamp)) {
 				hasLatestValue = false;
 			}
 		}else {
@@ -153,12 +155,12 @@ public class StatusMap {
 		return hasLatestValue;
 	}
 	
-	private boolean hasLatestValueImpl(String inKSName, ByteBuffer inKey, long inTimestamp) {
+	private boolean hasLatestValueImpl(String inKSName,String inKeyStr, ByteBuffer inKey, long inTimestamp) {
 		boolean hasLatestValue = true;
 		List<InetAddress> replicaList = HBUtils.getReplicaList(inKSName, inKey);
 		replicaList.remove(HBUtils.getLocalAddress());
 		for (InetAddress sourceName : replicaList) {
-			Status status = m_currentEntries.get(inKey, sourceName.getHostAddress());
+			Status status = m_currentEntries.get(inKeyStr, sourceName.getHostAddress());
 			if (status == null) {
 				hasLatestValue = false;
 				logger.info("StatusMap::hasLatestValueImpl, hasLatestValue == false, status == null");

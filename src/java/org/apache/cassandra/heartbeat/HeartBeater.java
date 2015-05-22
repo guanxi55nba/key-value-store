@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
@@ -57,7 +58,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	 * Used to send out status message
 	 */
 	ConcurrentHashMap<InetAddress, StatusSynMsg> m_statusMsgMap = new ConcurrentHashMap<InetAddress, StatusSynMsg>();
-	private TreeBasedTable<String, ByteBuffer, Long> m_versionMaps = TreeBasedTable.create();
+	private TreeBasedTable<String, ByteBuffer, AtomicLong> m_versionMaps = TreeBasedTable.create();
 	private byte[] m_versionMaplock = new byte[0];
 	private ScheduledFuture<?> scheduledHeartBeatTask;
 	private AtomicInteger version = new AtomicInteger(0);
@@ -177,15 +178,14 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 
 	public long getKeyVersionNo(String inKSName, ByteBuffer inKey) {
 		long version = -1;
-		synchronized (m_versionMaplock) {
-			Long atomicLong = m_versionMaps.get(inKSName, inKey);
-			if (atomicLong == null) {
-				m_versionMaps.put(inKSName, inKey, 0l);
-				version = 0;
-			} else {
-				version = ++atomicLong ;
-			}
+		AtomicLong atomicLong = m_versionMaps.get(inKSName, inKey);
+		if (atomicLong == null) {
+			m_versionMaps.put(inKSName, inKey, new AtomicLong(0));
+			version = 0;
+		} else {
+			version = atomicLong.incrementAndGet();
 		}
+		logger.error("HeartBeater::getKeyVersionNo {}", atomicLong);
 		return version;
 	}
 
@@ -214,7 +214,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 				String source = value.getString(HBConsts.SOURCE);
 				long vn = localSrcName.equalsIgnoreCase(source) ? value.getLong(HBConsts.VERSON_NO) : -1;
 				long ts = value.getLong(HBConsts.VERSION_WRITE_TIME) / 1000;
-				m_versionMaps.put(inKSName, partitionKey, vn);
+				m_versionMaps.put(inKSName, partitionKey, new AtomicLong(vn));
 				updateStatusMsgMap(inKSName, inCFName, partitionKey, vn, ts);
 			} catch (Exception e) {
 				logger.debug("Exception when update status msg mp", e);

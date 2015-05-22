@@ -2,7 +2,6 @@ package org.apache.cassandra.heartbeat;
 
 import java.net.InetAddress;
 
-import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.db.ConsistencyLevel;
 import org.apache.cassandra.heartbeat.status.StatusMap;

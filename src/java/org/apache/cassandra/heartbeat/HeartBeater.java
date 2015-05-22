@@ -229,18 +229,16 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	 * @param timestamp
 	 */
 	private void updateStatusMsgMap(String inKSName, String inCFName, ByteBuffer partitionKey, Long version, long timestamp) {
-		if(version>=0) {
-			List<InetAddress> replicaList = HBUtils.getReplicaList(inKSName, partitionKey);
-			replicaList.remove(replicaList.remove(HBUtils.getLocalAddress()));
-			CFMetaData cfMetaData = Schema.instance.getKSMetaData(inKSName).cfMetaData().get(inCFName);
-			for (InetAddress inetAddress : replicaList) {
-				StatusSynMsg statusMsgSyn = m_statusMsgMap.get(inetAddress);
-				if (statusMsgSyn == null) {
-					statusMsgSyn = new StatusSynMsg(localSrcName, null, System.currentTimeMillis());
-					m_statusMsgMap.put(inetAddress, statusMsgSyn);
-				}
-				statusMsgSyn.addKeyVersion(HBUtils.byteBufferToString(cfMetaData, partitionKey), version, timestamp);
+		List<InetAddress> replicaList = HBUtils.getReplicaList(inKSName, partitionKey);
+		replicaList.remove(replicaList.remove(HBUtils.getLocalAddress()));
+		CFMetaData cfMetaData = Schema.instance.getKSMetaData(inKSName).cfMetaData().get(inCFName);
+		for (InetAddress inetAddress : replicaList) {
+			StatusSynMsg statusMsgSyn = m_statusMsgMap.get(inetAddress);
+			if (statusMsgSyn == null) {
+				statusMsgSyn = new StatusSynMsg(localSrcName, null, System.currentTimeMillis());
+				m_statusMsgMap.put(inetAddress, statusMsgSyn);
 			}
+			statusMsgSyn.addKeyVersion(HBUtils.byteBufferToString(cfMetaData, partitionKey), version, timestamp);
 		}
 	}
 

@@ -158,10 +158,8 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 						Version vn = HBUtils.getMutationVersion(cf);
 						if (vn != null) {
 							long versionNo = localSrcName.equalsIgnoreCase(source) ? vn.getLocalVersion() : -1;
-							if(versionNo>=0){
-								long timestamp = vn.getTimestamp() / 1000;
-								updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, versionNo, timestamp);
-							}
+							long timestamp = vn.getTimestamp() / 1000;
+							updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, versionNo, timestamp);
 						} else {
 							logger.error("HeartBeater::updateStatusMsgMap, VersionNo is null");
 						}
@@ -185,7 +183,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 		} else {
 			version = atomicLong.incrementAndGet();
 		}
-		logger.error("HeartBeater::getKeyVersionNo {}", atomicLong);
+		//logger.error("HeartBeater::getKeyVersionNo {}", atomicLong);
 		return version;
 	}
 

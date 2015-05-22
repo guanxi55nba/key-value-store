@@ -17,7 +17,6 @@ import org.apache.cassandra.heartbeat.StatusSynMsg;
 import org.apache.cassandra.heartbeat.extra.Version;
 import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
 import org.apache.cassandra.service.pager.Pageable;
-import org.apache.cassandra.utils.keyvaluestore.ConfReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,8 +82,8 @@ public class StatusMap {
 				}
 				
 				// Notify sinked read handler
-				String ksName = ConfReader.instance.getKeySpaceName();
-				ReadHandler.instance.notifySubscription(ksName, key, inSynMsg.getTimestamp());
+				//String ksName = ConfReader.instance.getKeySpaceName();
+				ReadHandler.instance.notifySubscription(inSynMsg.getKsName(), key, inSynMsg.getTimestamp());
 			}
 		} else {
 			logger.error("inSynMsg is null");

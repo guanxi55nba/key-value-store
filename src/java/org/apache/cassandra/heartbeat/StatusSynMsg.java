@@ -99,7 +99,7 @@ public class StatusSynMsg {
 				sb.append("]");
 			sb.append(", ");
 		}
-		sb.append("TS : ");
+		sb.append("TS: ");
 		sb.append(HBUtils.dateFormat(timestamp));
 		sb.append(" }");
 		return sb.toString();

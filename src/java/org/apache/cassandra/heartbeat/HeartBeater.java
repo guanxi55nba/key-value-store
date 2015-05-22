@@ -101,7 +101,6 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 				for (Map.Entry<InetAddress, StatusSynMsg> entry : m_statusMsgMap.entrySet()) {
 					InetAddress destination = entry.getKey();
 					StatusSynMsg statusSynMsg = entry.getValue();
-
 					statusSynMsg.updateTimestamp(sendTime);
 					MessageOut<StatusSynMsg> finalMsg = new MessageOut<StatusSynMsg>(MessagingService.Verb.HEARTBEAT_DIGEST, statusSynMsg, StatusSynMsg.serializer);
 					MessagingService.instance().sendOneWay(finalMsg, destination);
@@ -158,8 +157,10 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 						Version vn = HBUtils.getMutationVersion(cf);
 						if (vn != null) {
 							long versionNo = localSrcName.equalsIgnoreCase(source) ? vn.getLocalVersion() : -1;
-							long timestamp = vn.getTimestamp() / 1000;
-							updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, versionNo, timestamp);
+							if(versionNo>=0){
+								long timestamp = vn.getTimestamp() / 1000;
+								updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, versionNo, timestamp);
+							}
 						} else {
 							logger.error("HeartBeater::updateStatusMsgMap, VersionNo is null");
 						}

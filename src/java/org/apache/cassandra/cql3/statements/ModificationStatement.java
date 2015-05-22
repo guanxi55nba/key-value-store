@@ -705,15 +705,15 @@ public abstract class ModificationStatement implements CQLStatement, MeasurableF
 				String ksName = cf.metadata().ksName;
 				long vn = -1;
 				boolean isReplicaNode = HBUtils.isReplicaNode(ksName, key);
-				String sourceName = DatabaseDescriptor.getListenAddress().getHostAddress();
+				String srcName = HBUtils.getLocalAddress().getHostAddress();
 				if (isReplicaNode) {
 					// add version no and local dc
 					vn = HeartBeater.instance.getKeyVersionNo(ksName, key);
 					// logger.info("getMutations: vn -> {}", vn);
 				} else {
-					sourceName += HBConsts.COORDINATOR;
+					srcName += HBConsts.COORDINATOR;
 				}
-				HBUtils.addVnAndSourceInUpdate(params, clusteringPrefix, cf, vn, sourceName);
+				HBUtils.addVnAndSourceInUpdate(params, clusteringPrefix, cf, vn, srcName);
 			}
 				
             Mutation mut = new Mutation(cfm.ksName, key, cf);

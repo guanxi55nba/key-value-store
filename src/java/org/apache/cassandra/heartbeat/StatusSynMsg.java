@@ -24,12 +24,12 @@ import org.slf4j.LoggerFactory;
 public class StatusSynMsg {
 	protected static final Logger logger = LoggerFactory.getLogger(StatusSynMsg.class);
 	public static final IVersionedSerializer<StatusSynMsg> serializer = new StatusMsgSerializationHelper();
-	final String dcName;
+	final String srcName;
 	long timestamp;
 	private TreeMap<String, TreeMap<Long, Long>> m_data;
 
-	public StatusSynMsg(String dcName, TreeMap<String, TreeMap<Long, Long>> data, long timestamp) {
-		this.dcName = dcName;
+	public StatusSynMsg(String srcName, TreeMap<String, TreeMap<Long, Long>> data, long timestamp) {
+		this.srcName = srcName;
 		this.timestamp = timestamp;
 		this.m_data = data;
 		if (m_data == null)
@@ -74,8 +74,8 @@ public class StatusSynMsg {
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 		sb.append("{ ");
-		sb.append("DCName: ");
-		sb.append(dcName);
+		sb.append("Src: ");
+		sb.append(srcName);
 		sb.append(", ");
 		Iterator<Entry<String, TreeMap<Long, Long>>> iterator = m_data.entrySet().iterator();
 		while (iterator.hasNext()) {
@@ -103,27 +103,27 @@ public class StatusSynMsg {
 		return sb.toString();
 	}
 
-	public String getDCName() {
-		return dcName;
+	public String getSrcName() {
+		return srcName;
 	}
 }
 
 class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg> {
 	@Override
 	public void serialize(StatusSynMsg msg, DataOutputPlus out, int version) throws IOException {
-		out.writeUTF(msg.dcName);
+		out.writeUTF(msg.srcName);
 		out.writeLong(msg.getTimestamp());
 		out.write(SerializationUtils.serialize(msg.getData()));
 	}
 
 	@Override
 	public StatusSynMsg deserialize(DataInput in, int version) throws IOException {
-		String dcName = in.readUTF();
+		String srcName = in.readUTF();
 		long timestamp = in.readLong();
 		@SuppressWarnings("unchecked")
 		TreeMap<String, TreeMap<Long, Long>> data = (TreeMap<String, TreeMap<Long, Long>>) SerializationUtils
 				.deserialize(readByteArray(in));
-		return new StatusSynMsg(dcName, data, timestamp);
+		return new StatusSynMsg(srcName, data, timestamp);
 	}
 
 	public static byte[] readByteArray(DataInput in) throws IOException {
@@ -138,7 +138,7 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
 
 	@Override
 	public long serializedSize(StatusSynMsg statusMsgSyn, int version) {
-		long size = TypeSizes.NATIVE.sizeof(statusMsgSyn.dcName);
+		long size = TypeSizes.NATIVE.sizeof(statusMsgSyn.srcName);
 		size += TypeSizes.NATIVE.sizeof(statusMsgSyn.getTimestamp());
 		size += SerializationUtils.serialize(statusMsgSyn.getData()).length;
 		return size;

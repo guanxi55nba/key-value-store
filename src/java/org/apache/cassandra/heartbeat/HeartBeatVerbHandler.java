@@ -27,10 +27,10 @@ public class HeartBeatVerbHandler implements IVerbHandler<StatusSynMsg> {
 		if(ConfReader.instance.heartbeatEnable()) {
 			// Get datacenter name
 			InetAddress from = message.from;
-			String dcName = DatabaseDescriptor.getEndpointSnitch().getDatacenter(from);
+			String srcName = DatabaseDescriptor.getEndpointSnitch().getDatacenter(from);
 
 			// Update multi dc status map
-			StatusMap.instance.updateStatusMap(dcName, message.payload);
+			StatusMap.instance.updateStatusMap(srcName, message.payload);
 		}
 	}
 

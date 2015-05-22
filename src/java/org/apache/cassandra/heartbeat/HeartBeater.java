@@ -18,7 +18,6 @@ import javax.management.ObjectName;
 
 import org.apache.cassandra.concurrent.DebuggableScheduledThreadPoolExecutor;
 import org.apache.cassandra.config.CFMetaData;
-import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.cql3.UntypedResultSet.Row;
 import org.apache.cassandra.db.ColumnFamily;
@@ -63,7 +62,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	private ScheduledFuture<?> scheduledHeartBeatTask;
 	private AtomicInteger version = new AtomicInteger(0);
 	public static final HeartBeater instance = new HeartBeater();
-	private String localDCName = DatabaseDescriptor.getLocalDataCenter();
+	private String localSrcName = HBUtils.getLocalAddress().getHostAddress();
 	private boolean enable = ConfReader.instance.heartbeatEnable();
 	
 
@@ -155,17 +154,17 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 				ByteBuffer partitionKey = mutation.key();
 				for (ColumnFamily cf : mutation.getColumnFamilies()) {
 					String source = HBUtils.getMutationSource(cf);
-					if (localDCName != null) {
+					if (localSrcName != null) {
 						Version vn = HBUtils.getMutationVersion(cf);
 						if (vn != null) {
-							long versionNo = localDCName.equalsIgnoreCase(source) ? vn.getLocalVersion() : -1;
+							long versionNo = localSrcName.equalsIgnoreCase(source) ? vn.getLocalVersion() : -1;
 							long timestamp = vn.getTimestamp() / 1000;
 							updateStatusMsgMap(ksName, cf.metadata().cfName, partitionKey, versionNo, timestamp);
 						} else {
 							logger.error("HeartBeater::updateStatusMsgMap, VersionNo is null");
 						}
 					} else {
-						logger.error("HeartBeater::updateStatusMsgMap, localDCName is null");
+						logger.error("HeartBeater::updateStatusMsgMap, localSrcName is null");
 					}
 
 				}
@@ -212,7 +211,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 		if (value != null) {
 			try {
 				String source = value.getString(HBConsts.SOURCE);
-				long vn = localDCName.equalsIgnoreCase(source) ? value.getLong(HBConsts.VERSON_NO) : -1;
+				long vn = localSrcName.equalsIgnoreCase(source) ? value.getLong(HBConsts.VERSON_NO) : -1;
 				long ts = value.getLong(HBConsts.VERSION_WRITE_TIME) / 1000;
 				m_versionMaps.put(inKSName, partitionKey, vn);
 				updateStatusMsgMap(inKSName, inCFName, partitionKey, vn, ts);
@@ -231,12 +230,12 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	 */
 	private void updateStatusMsgMap(String inKSName, String inCFName, ByteBuffer partitionKey, Long version, long timestamp) {
 		List<InetAddress> replicaList = HBUtils.getReplicaList(inKSName, partitionKey);
-		replicaList.remove(replicaList.remove(DatabaseDescriptor.getListenAddress()));
+		replicaList.remove(replicaList.remove(HBUtils.getLocalAddress()));
 		CFMetaData cfMetaData = Schema.instance.getKSMetaData(inKSName).cfMetaData().get(inCFName);
 		for (InetAddress inetAddress : replicaList) {
 			StatusSynMsg statusMsgSyn = m_statusMsgMap.get(inetAddress);
 			if (statusMsgSyn == null) {
-				statusMsgSyn = new StatusSynMsg(DatabaseDescriptor.getLocalDataCenter(), null, System.currentTimeMillis());
+				statusMsgSyn = new StatusSynMsg(localSrcName, null, System.currentTimeMillis());
 				m_statusMsgMap.put(inetAddress, statusMsgSyn);
 			}
 			statusMsgSyn.addKeyVersion(HBUtils.byteBufferToString(cfMetaData, partitionKey), version, timestamp);

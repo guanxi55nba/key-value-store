@@ -1,6 +1,7 @@
 package org.apache.cassandra.heartbeat;
 
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -47,6 +48,8 @@ public class HBUtils {
 	private static final Logger logger = LoggerFactory.getLogger(HBUtils.class);
 
 	public static final List<String> SYSTEM_KEYSPACES = new ArrayList<String>(Arrays.asList("system", "system_traces"));;
+	
+	private static InetAddress localInetAddress;
 
 	public static Row getKeyValue(String inKSName, String inCFName, ByteBuffer key) {
 		Row row = null;
@@ -284,10 +287,10 @@ public class HBUtils {
 	 * @param clusteringPrefix
 	 * @param cf
 	 * @param vn
-	 * @param dcName
+	 * @param srcName
 	 * @throws InvalidRequestException
 	 */
-	public static void addVnAndSourceInUpdate(UpdateParameters params, Composite clusteringPrefix, ColumnFamily cf, long vn, String dcName) throws InvalidRequestException {
+	public static void addVnAndSourceInUpdate(UpdateParameters params, Composite clusteringPrefix, ColumnFamily cf, long vn, String srcName) throws InvalidRequestException {
 		String ksName = cf.metadata().ksName;
 		if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName)) {
 			// Add version no
@@ -304,14 +307,26 @@ public class HBUtils {
 			ColumnDefinition dcColDef = cf.metadata().getColumnDefinition(dcColName);
 			CellName dcCellName = cf.getComparator().create(clusteringPrefix, dcColDef);
 			if(cf.getColumn(dcCellName)==null) {
-				ByteBuffer dcCellValue = ByteBufferUtil.bytes(dcName);
+				ByteBuffer dcCellValue = ByteBufferUtil.bytes(srcName);
 				cf.addColumn(params.makeColumn(dcCellName, dcCellValue));
 			}
 		}
 	}
 	
 	public static boolean isReplicaNode(String inKeySpaceName, ByteBuffer key) {
-		return getReplicaList(inKeySpaceName, key).contains(DatabaseDescriptor.getListenAddress());
+		return getReplicaList(inKeySpaceName, key).contains(getLocalAddress());
 	}
+	
+	
+	public static InetAddress getLocalAddress() {
+		if (localInetAddress == null)
+			try {
+				localInetAddress = DatabaseDescriptor.getListenAddress() == null ? InetAddress.getLocalHost() : DatabaseDescriptor.getListenAddress();
+			} catch (UnknownHostException e) {
+				throw new RuntimeException(e);
+			}
+		return localInetAddress;
+	}
+
 
 }

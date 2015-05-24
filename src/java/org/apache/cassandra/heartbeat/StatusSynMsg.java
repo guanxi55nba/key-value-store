@@ -36,13 +36,13 @@ public class StatusSynMsg {
 		this.timestamp = timestamp;
 		this.m_data = data;
 		if (m_data == null)
-			m_data = new TreeMap<String, TreeMap<Long, Long>>();
+			m_data = (TreeMap<String, TreeMap<Long, Long>>) Collections.synchronizedMap(new TreeMap<String, TreeMap<Long, Long>>());
 	}
 
 	public void addKeyVersion(String key, Long version, Long timestamp) {
 		TreeMap<Long, Long> treeMap = m_data.get(key);
 		if (treeMap == null) {
-			treeMap = new TreeMap<Long, Long>();
+			treeMap = (TreeMap<Long, Long>) Collections.synchronizedMap (new TreeMap<Long, Long>());
 			m_data.put(key, treeMap);
 		}
 		treeMap.put(version, timestamp);

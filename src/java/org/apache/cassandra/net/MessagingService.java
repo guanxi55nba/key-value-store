@@ -740,7 +740,7 @@ public final class MessagingService implements MessagingServiceMBean
             return;
         }
         
-		if (message.payload instanceof StatusSynMsg && ConfReader.instance.heartbeatEnable()) {
+		if (message.payload instanceof StatusSynMsg && ConfReader.instance.heartbeatEnable() && ConfReader.instance.isLogEnabled()) {
 			logger.info("Receive status SynMsg " + ((StatusSynMsg) message.payload).toString());
 		}
 

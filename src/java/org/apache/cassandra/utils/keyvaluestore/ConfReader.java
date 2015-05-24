@@ -14,6 +14,7 @@ public class ConfReader {
 	public static Properties tranProperties;
 	private boolean heartbeatEnable = false;
 	private String ksName = "";
+	private boolean logEnabled = false;
 	public static final ConfReader instance = new ConfReader();
 
 	private ConfReader() {
@@ -22,6 +23,7 @@ public class ConfReader {
 		try {
 			configuration.load(new FileInputStream(new File(confStr)));
 			heartbeatEnable = Boolean.valueOf(configuration.getProperty("heartbeat.enable"));
+			logEnabled = Boolean.valueOf(configuration.getProperty("log.enable"));
 		} catch (IOException e) {
 			logger.error("Failed to load configuration " + confStr);
 			e.printStackTrace();
@@ -53,5 +55,9 @@ public class ConfReader {
 	
 	public boolean heartbeatEnable() {
 		return heartbeatEnable;
+	}
+	
+	public boolean isLogEnabled() {
+		return logEnabled;
 	}
 }

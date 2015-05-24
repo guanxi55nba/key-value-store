@@ -3,6 +3,7 @@ package org.apache.cassandra.heartbeat;
 import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -35,7 +36,7 @@ public class StatusSynMsg {
 		this.timestamp = timestamp;
 		this.m_data = data;
 		if (m_data == null)
-			m_data = new TreeMap<String, TreeMap<Long, Long>>();
+			m_data = (TreeMap<String, TreeMap<Long, Long>>) Collections.synchronizedMap(new TreeMap<String, TreeMap<Long, Long>>());
 	}
 
 	public void addKeyVersion(String key, Long version, Long timestamp) {

@@ -3,7 +3,6 @@ package org.apache.cassandra.heartbeat;
 import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -36,16 +35,18 @@ public class StatusSynMsg {
 		this.timestamp = timestamp;
 		this.m_data = data;
 		if (m_data == null)
-			m_data = (TreeMap<String, TreeMap<Long, Long>>) Collections.synchronizedMap(new TreeMap<String, TreeMap<Long, Long>>());
+			m_data = new TreeMap<String, TreeMap<Long, Long>>();
 	}
 
 	public void addKeyVersion(String key, Long version, Long timestamp) {
 		TreeMap<Long, Long> treeMap = m_data.get(key);
-		if (treeMap == null) {
-			treeMap = (TreeMap<Long, Long>) Collections.synchronizedMap (new TreeMap<Long, Long>());
-			m_data.put(key, treeMap);
+		synchronized (this) {
+			if (treeMap == null) {
+				treeMap = new TreeMap<Long, Long>();
+				m_data.put(key, treeMap);
+			}
+			treeMap.put(version, timestamp);
 		}
-		treeMap.put(version, timestamp);
 	}
 
 	public void updateTimestamp(long timestamp) {
@@ -69,8 +70,10 @@ public class StatusSynMsg {
 	 * set it to {key: [] }
 	 */
 	public void cleanData() {
-		for (TreeMap<Long, Long> treeMap : m_data.values()) {
-			treeMap.clear();
+		synchronized (this) {
+			for (TreeMap<Long, Long> treeMap : m_data.values()) {
+				treeMap.clear();
+			}
 		}
 	}
 
@@ -80,25 +83,27 @@ public class StatusSynMsg {
 		sb.append("Src: ");
 		sb.append(srcName);
 		sb.append(", ");
-		Iterator<Entry<String, TreeMap<Long, Long>>> iterator = m_data.entrySet().iterator();
-		while (iterator.hasNext()) {
-			Entry<String, TreeMap<Long, Long>> dataEntry = iterator.next();
-			sb.append(dataEntry.getKey());
-			sb.append(":");
-			sb.append("[ ");
-			for (Map.Entry<Long, Long> entry : dataEntry.getValue().entrySet()) {
-				sb.append(entry.getKey());
+		synchronized (this) {
+			Iterator<Entry<String, TreeMap<Long, Long>>> iterator = m_data.entrySet().iterator();
+			while (iterator.hasNext()) {
+				Entry<String, TreeMap<Long, Long>> dataEntry = iterator.next();
+				sb.append(dataEntry.getKey());
 				sb.append(":");
-				sb.append("'");
-				sb.append(HBUtils.dateFormat(entry.getValue()));
-				sb.append("'");
-				sb.append(",");
+				sb.append("[ ");
+				for (Map.Entry<Long, Long> entry : dataEntry.getValue().entrySet()) {
+					sb.append(entry.getKey());
+					sb.append(":");
+					sb.append("'");
+					sb.append(HBUtils.dateFormat(entry.getValue()));
+					sb.append("'");
+					sb.append(",");
+				}
+				if (dataEntry.getValue().size() > 0)
+					sb.setCharAt(sb.length() - 1, ']');
+				else
+					sb.append("]");
+				sb.append(", ");
 			}
-			if (dataEntry.getValue().size() > 0)
-				sb.setCharAt(sb.length() - 1, ']');
-			else
-				sb.append("]");
-			sb.append(", ");
 		}
 		sb.append("TS: ");
 		sb.append(HBUtils.dateFormat(timestamp));
@@ -122,7 +127,9 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
 		out.writeUTF(msg.srcName);
 		
 		out.writeLong(msg.getTimestamp());
-		out.write(SerializationUtils.serialize(msg.getData()));
+		synchronized (msg) {
+			out.write(SerializationUtils.serialize(msg.getData()));
+		}
 	}
 
 	@Override
@@ -150,7 +157,9 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
 	public long serializedSize(StatusSynMsg statusMsgSyn, int version) {
 		long size = TypeSizes.NATIVE.sizeof(statusMsgSyn.srcName);
 		size += TypeSizes.NATIVE.sizeof(statusMsgSyn.getTimestamp());
-		size += SerializationUtils.serialize(statusMsgSyn.getData()).length;
+		synchronized (statusMsgSyn) {
+			size += SerializationUtils.serialize(statusMsgSyn.getData()).length;
+		}
 		return size;
 	}
 }

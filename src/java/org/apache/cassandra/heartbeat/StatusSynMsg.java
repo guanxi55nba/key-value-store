@@ -36,7 +36,7 @@ public class StatusSynMsg {
 		this.timestamp = timestamp;
 		this.m_data = data;
 		if (m_data == null)
-			m_data = (TreeMap<String, TreeMap<Long, Long>>) Collections.synchronizedMap(new TreeMap<String, TreeMap<Long, Long>>());
+			m_data = new TreeMap<String, TreeMap<Long, Long>>();
 	}
 
 	public void addKeyVersion(String key, Long version, Long timestamp) {

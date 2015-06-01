@@ -11,7 +11,6 @@ import java.util.TreeMap;
 import org.apache.cassandra.db.TypeSizes;
 import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.io.util.DataOutputPlus;
-import org.apache.commons.lang3.SerializationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,21 +124,36 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
 	public void serialize(StatusSynMsg msg, DataOutputPlus out, int version) throws IOException {
 		out.writeUTF(msg.ksName);
 		out.writeUTF(msg.srcName);
-		
 		out.writeLong(msg.getTimestamp());
+		out.writeLong(msg.getData().size());
 		synchronized (msg) {
-			out.write(SerializationUtils.serialize(msg.getData()));
+			for (Map.Entry<String, TreeMap<Long, Long>> entry : msg.getData().entrySet()) {
+				out.writeUTF(entry.getKey());
+				out.writeLong(entry.getValue().size());
+				for (Map.Entry<Long, Long> inner : entry.getValue().entrySet()) {
+					out.writeLong(inner.getKey());
+					out.writeLong(inner.getValue());
+				}
+			}
 		}
 	}
 
 	@Override
-	public StatusSynMsg deserialize(DataInput in, int version) throws IOException {
+	public synchronized StatusSynMsg deserialize(DataInput in, int version) throws IOException {
 		String ksName = in.readUTF();
 		String srcName = in.readUTF();
 		long timestamp = in.readLong();
-		@SuppressWarnings("unchecked")
-		TreeMap<String, TreeMap<Long, Long>> data = (TreeMap<String, TreeMap<Long, Long>>) SerializationUtils
-				.deserialize(readByteArray(in));
+		long keySize = in.readLong();
+		TreeMap<String, TreeMap<Long, Long>> data = new TreeMap<String, TreeMap<Long,Long>>();
+		for (int i = 0; i < keySize; i++) {
+			String key = in.readUTF();
+			long mapSize = in.readLong();
+			TreeMap<Long, Long> maps = new TreeMap<Long, Long>();
+			for (int j = 0; j < mapSize; j++) {
+				maps.put(in.readLong(), in.readLong());
+			}
+			data.put(key, maps);
+		}
 		return new StatusSynMsg(ksName,srcName, data, timestamp);
 	}
 
@@ -157,8 +171,16 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
 	public long serializedSize(StatusSynMsg statusMsgSyn, int version) {
 		long size = TypeSizes.NATIVE.sizeof(statusMsgSyn.srcName);
 		size += TypeSizes.NATIVE.sizeof(statusMsgSyn.getTimestamp());
+		size += TypeSizes.NATIVE.sizeof(Long.valueOf(statusMsgSyn.getData().size()));
 		synchronized (statusMsgSyn) {
-			size += SerializationUtils.serialize(statusMsgSyn.getData()).length;
+			for (Map.Entry<String, TreeMap<Long, Long>> entry : statusMsgSyn.getData().entrySet()) {
+				size += TypeSizes.NATIVE.sizeof(entry.getKey());
+				size += TypeSizes.NATIVE.sizeof(Long.valueOf(entry.getValue().size()));
+				for (Map.Entry<Long, Long> inner : entry.getValue().entrySet()) {
+					size += TypeSizes.NATIVE.sizeof(inner.getKey());
+					size += TypeSizes.NATIVE.sizeof(inner.getValue());
+				}
+			}
 		}
 		return size;
 	}

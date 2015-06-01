@@ -39,7 +39,7 @@ public class StatusSynMsg {
 
 	public void addKeyVersion(String key, Long version, Long timestamp) {
 		TreeMap<Long, Long> treeMap = m_data.get(key);
-		synchronized (this) {
+		synchronized (m_data) {
 			if (treeMap == null) {
 				treeMap = new TreeMap<Long, Long>();
 				m_data.put(key, treeMap);
@@ -69,7 +69,7 @@ public class StatusSynMsg {
 	 * set it to {key: [] }
 	 */
 	public void cleanData() {
-		synchronized (this) {
+		synchronized (m_data) {
 			for (TreeMap<Long, Long> treeMap : m_data.values()) {
 				treeMap.clear();
 			}
@@ -82,7 +82,7 @@ public class StatusSynMsg {
 		sb.append("Src: ");
 		sb.append(srcName);
 		sb.append(", ");
-		synchronized (this) {
+		synchronized (m_data) {
 			Iterator<Entry<String, TreeMap<Long, Long>>> iterator = m_data.entrySet().iterator();
 			while (iterator.hasNext()) {
 				Entry<String, TreeMap<Long, Long>> dataEntry = iterator.next();

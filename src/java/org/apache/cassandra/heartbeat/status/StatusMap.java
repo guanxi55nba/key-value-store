@@ -47,7 +47,7 @@ public class StatusMap {
 	 * @param inSrcName
 	 * @param inSynMsg
 	 */
-	public void updateStatusMap(String inSrcName, StatusSynMsg inSynMsg) {
+	public void updateStatusMap(String inSrcName, final StatusSynMsg inSynMsg) {
 		if (inSynMsg != null) {
 			TreeMap<String, TreeMap<Long, Long>> statusData = inSynMsg.getData();
 			for (Map.Entry<String, TreeMap<Long, Long>> entry : statusData.entrySet()) {
@@ -73,14 +73,15 @@ public class StatusMap {
 
 				// Update current status
 				Status status = m_currentEntries.get(key, inSrcName);
-				if (status == null) {
-					status = new Status(inSynMsg.getTimestamp(), vn_ts);
-					m_currentEntries.put(key, inSrcName, status);
-				} else {
-					status.updateVnTsData(vn_ts);
-					status.setUpdateTs(inSynMsg.getTimestamp());
+				synchronized (m_currentEntries) {
+					if (status == null) {
+						status = new Status(inSynMsg.getTimestamp(), vn_ts);
+						m_currentEntries.put(key, inSrcName, status);
+					} else {
+						status.updateVnTsData(vn_ts);
+						status.setUpdateTs(inSynMsg.getTimestamp());
+					}
 				}
-				
 				// Notify sinked read handler
 				//String ksName = ConfReader.instance.getKeySpaceName();
 				ReadHandler.instance.notifySubscription(inSynMsg.getKsName(), key, inSynMsg.getTimestamp());
@@ -110,11 +111,13 @@ public class StatusMap {
 
 					// Update removed status
 					Status removedStatus = m_removedEntries.get(key, inSrcName);
-					if (removedStatus == null && currentStatus != null) {
-						removedStatus = new Status(currentTs, removedEntry);
-						m_removedEntries.put(key, inSrcName, removedStatus);
-					} else if (removedStatus != null) {
-						removedStatus.updateVnTsData(removedEntry);
+					synchronized (m_removedEntries) {
+						if (removedStatus == null && currentStatus != null) {
+							removedStatus = new Status(currentTs, removedEntry);
+							m_removedEntries.put(key, inSrcName, removedStatus);
+						} else if (removedStatus != null) {
+							removedStatus.updateVnTsData(removedEntry);
+						}
 					}
 				}
 			}

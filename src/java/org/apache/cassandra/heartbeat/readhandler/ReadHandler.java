@@ -1,8 +1,9 @@
 package org.apache.cassandra.heartbeat.readhandler;
 
-import java.nio.ByteBuffer;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -32,7 +33,6 @@ import org.slf4j.LoggerFactory;
  */
 public class ReadHandler {
 	private static final Logger logger = LoggerFactory.getLogger(ReadHandler.class);
-	ByteBuffer key;
 	ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, ConcurrentSkipListSet<Subscription>> >> m_subscriptionMatrics;
 
 	public static final ReadHandler instance = new ReadHandler();
@@ -81,6 +81,7 @@ public class ReadHandler {
 					if (ConfReader.instance.isLogEnabled())
 						logger.info("ReadHandler.notifySubscription: ts<=timestamp");
 					ConcurrentSkipListSet<Subscription> subs = entry.getValue();
+					Set<Subscription> removed = new HashSet<Subscription>();
 					if (subs != null) {
 						for (Subscription sub : subs) {
 							// Check whether subscription has latest value
@@ -88,9 +89,10 @@ public class ReadHandler {
 								synchronized (sub.getLockObject()) {
 									sub.getLockObject().notify();
 								}
-								subs.remove(sub);
+								removed.add(sub);
 							}
 						}
+						subs.removeAll(removed);
 					}
 				}
 			}

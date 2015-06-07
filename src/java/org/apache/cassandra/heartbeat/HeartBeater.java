@@ -95,7 +95,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 				// Send out status syn msg
 				for (Map.Entry<InetAddress, StatusSynMsg> entry : m_statusMsgMap.entrySet()) {
 					InetAddress destination = entry.getKey();
-					StatusSynMsg statusSynMsg = entry.getValue();
+					StatusSynMsg statusSynMsg = entry.getValue().copy();
 					statusSynMsg.updateTimestamp(sendTime);
 					MessageOut<StatusSynMsg> finalMsg = new MessageOut<StatusSynMsg>(MessagingService.Verb.HEARTBEAT_DIGEST, statusSynMsg, StatusSynMsg.serializer);
 					MessagingService.instance().sendOneWay(finalMsg, destination);
@@ -241,8 +241,10 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 		for (InetAddress inetAddress : replicaList) {
 			StatusSynMsg statusMsgSyn = m_statusMsgMap.get(inetAddress);
 			if (statusMsgSyn == null) {
-				statusMsgSyn = new StatusSynMsg(inKSName,localSrcName, null, System.currentTimeMillis());
-				m_statusMsgMap.put(inetAddress, statusMsgSyn);
+				StatusSynMsg newMsg = new StatusSynMsg(inKSName,localSrcName, null, System.currentTimeMillis());
+				statusMsgSyn = m_statusMsgMap.putIfAbsent(inetAddress, newMsg);
+				if(statusMsgSyn==null)
+				    statusMsgSyn = newMsg;
 			}
 			statusMsgSyn.addKeyVersion(HBUtils.byteBufferToString(cfMetaData, partitionKey), version, timestamp);
 		}

@@ -5,6 +5,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
@@ -29,26 +30,35 @@ public class StatusSynMsg
     final String ksName;
     final String srcName;
     long timestamp;
-    private ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> m_data;
+    private ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> m_data = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>();
+    //Random randomGenerator = new Random();
 
     public StatusSynMsg(String ksName, String srcName, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> data, long timestamp)
     {
         this.ksName = ksName;
         this.srcName = srcName;
         this.timestamp = timestamp;
-        this.m_data = data;
-        if (m_data == null)
-            m_data = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>();
-        // initialize(10000);
+        if (data != null && !data.isEmpty())
+        {
+            for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : data.entrySet())
+            {
+                ConcurrentSkipListMap<Long, Long> result = m_data.putIfAbsent(entry.getKey(),new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
+                if (result != null)
+                    result.putAll(entry.getValue());
+            }
+        }
     }
 
     public void addKeyVersion(String key, Long version, Long timestamp)
     {
+//		key = "user" + randomGenerator.nextInt(10000);
+//		version = (long) randomGenerator.nextInt(10000);
+//		timestamp = System.currentTimeMillis();
         ConcurrentSkipListMap<Long, Long> vnTsMap = m_data.get(key);
         if (vnTsMap == null)
         {
             vnTsMap = new ConcurrentSkipListMap<Long, Long>();
-            m_data.put(key, vnTsMap);
+                m_data.put(key, vnTsMap);
         }
         vnTsMap.put(version, timestamp);
     }
@@ -98,9 +108,7 @@ public class StatusSynMsg
     public void cleanData()
     {
         for (ConcurrentSkipListMap<Long, Long> vnTsMap : m_data.values())
-        {
-            vnTsMap.clear();
-        }
+                vnTsMap.clear();
     }
 
     public String toString()
@@ -160,6 +168,11 @@ public class StatusSynMsg
     public String getKsName()
     {
         return ksName;
+    }
+    
+    public StatusSynMsg copy()
+    {
+        return new StatusSynMsg(ksName, srcName, m_data, timestamp);
     }
 }
 

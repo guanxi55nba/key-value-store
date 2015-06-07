@@ -706,14 +706,13 @@ public abstract class ModificationStatement implements CQLStatement, MeasurableF
 				long vn = -1;
 				boolean isReplicaNode = HBUtils.isReplicaNode(ksName, key);
 				String srcName = HBUtils.getLocalAddress().getHostAddress();
+				
 				if (isReplicaNode) {
 					// add version no and local dc
 					vn = HeartBeater.instance.getKeyVersionNo(ksName, key);
 					// logger.info("getMutations: vn -> {}", vn);
-				} else {
-					srcName += HBConsts.COORDINATOR;
 				}
-				HBUtils.addVnAndSourceInUpdate(params, clusteringPrefix, cf, vn, srcName);
+				HBUtils.addVnAndSourceInUpdate(params, clusteringPrefix, cf, vn, isReplicaNode?srcName:srcName+HBConsts.COORDINATOR);
 			}
 				
             Mutation mut = new Mutation(cfm.ksName, key, cf);

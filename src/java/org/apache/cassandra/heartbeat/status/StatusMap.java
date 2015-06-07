@@ -4,10 +4,10 @@ import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
-import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.RangeSliceCommand;
@@ -17,10 +17,9 @@ import org.apache.cassandra.heartbeat.StatusSynMsg;
 import org.apache.cassandra.heartbeat.extra.Version;
 import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
 import org.apache.cassandra.service.pager.Pageable;
+import org.apache.cassandra.utils.keyvaluestore.ConfReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.collect.TreeBasedTable;
 
 /**
  * Stand alone component to keep status msg related info map
@@ -32,13 +31,13 @@ public class StatusMap {
 
 	private static final Logger logger = LoggerFactory.getLogger(StatusMap.class);
 
-	TreeBasedTable<String, String, Status> m_currentEntries = null; // key,src,statusmap
-	TreeBasedTable<String, String, Status> m_removedEntries = null; // key,src,statusmap
+	ConcurrentHashMap<String, ConcurrentHashMap<String, Status>> m_currentEntries; // key,src,statusmap
+	ConcurrentHashMap<String, ConcurrentHashMap<String, Status>> m_removedEntries; // key,src,statusmap
 	public static final StatusMap instance = new StatusMap();
 
 	private StatusMap() {
-		m_currentEntries = TreeBasedTable.create();
-		m_removedEntries = TreeBasedTable.create();
+		m_currentEntries = new ConcurrentHashMap<String, ConcurrentHashMap<String, Status>>();
+		m_removedEntries = new ConcurrentHashMap<String, ConcurrentHashMap<String, Status>>();
 	}
 
 	/**
@@ -54,40 +53,28 @@ public class StatusMap {
 				String key = entry.getKey();
 
 				// Filter the status in the removed entries
-				Status removedStatus = m_removedEntries.get(key, inSrcName);
-				TreeMap<Long, Long> removedVnToTs = new TreeMap<Long, Long>();
-				if (removedStatus != null) {
-					removedVnToTs = removedStatus.getVersionTsMap();
-				}
+				Status removedStatus = getStatusFromEntryMap(m_removedEntries, key, inSrcName);
+				ConcurrentSkipListMap<Long, Long> removedVnToTs = removedStatus == null ? new ConcurrentSkipListMap<Long, Long>() : removedStatus.getVersionTsMap();
 				TreeMap<Long, Long> valueMap = entry.getValue();
-				TreeMap<Long, Long> vn_ts = new TreeMap<Long, Long>();
+				ConcurrentSkipListMap<Long, Long> vn_ts = new ConcurrentSkipListMap<Long, Long>();
 				if (removedVnToTs == null || removedVnToTs.size() == 0) {
-					vn_ts = valueMap;
+					vn_ts.putAll(valueMap);
 				} else {
 					for (Map.Entry<Long, Long> item : valueMap.entrySet()) {
-						if (!removedVnToTs.containsKey(item.getKey())) {
+						if (!removedVnToTs.containsKey(item.getKey()))
 							vn_ts.put(item.getKey(), item.getValue());
-						}
 					}
 				}
 
 				// Update current status
-				Status status = m_currentEntries.get(key, inSrcName);
-				synchronized (m_currentEntries) {
-					if (status == null) {
-						status = new Status(inSynMsg.getTimestamp(), vn_ts);
-						m_currentEntries.put(key, inSrcName, status);
-					} else {
-						status.updateVnTsData(vn_ts);
-						status.setUpdateTs(inSynMsg.getTimestamp());
-					}
-				}
+				updateEntryMapStatus(m_currentEntries, key, inSrcName, vn_ts, inSynMsg.getTimestamp());
+				
 				// Notify sinked read handler
-				//String ksName = ConfReader.instance.getKeySpaceName();
 				ReadHandler.instance.notifySubscription(inSynMsg.getKsName(), key, inSynMsg.getTimestamp());
 			}
 		} else {
-			logger.error("inSynMsg is null");
+			if(ConfReader.instance.isLogEnabled())
+				logger.error("inSynMsg is null");
 		}
 	}
 
@@ -98,26 +85,23 @@ public class StatusMap {
 			if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName)) {
 				for (ColumnFamily col : inMutation.getColumnFamilies()) {
 					String key = HBUtils.getPrimaryKeyName(col.metadata());
-					Status currentStatus = m_currentEntries.get(key, inSrcName);
-					TreeMap<Long, Long> removedEntry = new TreeMap<Long, Long>();
+					Status currentStatus = getStatusFromEntryMap(m_currentEntries, key, inSrcName);
+					ConcurrentSkipListMap<Long, Long> removedEntry = new ConcurrentSkipListMap<Long, Long>();
 					Version version = HBUtils.getMutationVersion(col);
 					if (version != null) {
 						if (currentStatus != null)
 							currentStatus.removeEntry(version.getLocalVersion());
 						removedEntry.put(version.getLocalVersion(), currentTs);
-					} else {
-						logger.error("StatusMap::removeEntry, version value is null, mutation: {}", inMutation);
+					} else if(ConfReader.instance.isLogEnabled()) {
+							logger.error("StatusMap::removeEntry, version value is null, mutation: {}", inMutation);
 					}
 
 					// Update removed status
-					Status removedStatus = m_removedEntries.get(key, inSrcName);
-					synchronized (m_removedEntries) {
-						if (removedStatus == null && currentStatus != null) {
-							removedStatus = new Status(currentTs, removedEntry);
-							m_removedEntries.put(key, inSrcName, removedStatus);
-						} else if (removedStatus != null) {
-							removedStatus.updateVnTsData(removedEntry);
-						}
+					Status removedStatus = getStatusFromEntryMap(m_removedEntries, key, inSrcName);;
+					if (removedStatus == null && currentStatus != null) {
+						updateEntryMapStatus(m_removedEntries, key, inSrcName, removedEntry, currentTs);
+					} else if (removedStatus != null) {
+						removedStatus.updateVnTsData(removedEntry);
 					}
 				}
 			}
@@ -162,7 +146,7 @@ public class StatusMap {
 		List<InetAddress> replicaList = HBUtils.getReplicaList(inKSName, inKey);
 		replicaList.remove(HBUtils.getLocalAddress());
 		for (InetAddress sourceName : replicaList) {
-			Status status = m_currentEntries.get(inKeyStr, sourceName.getHostAddress());
+			Status status = getStatusFromEntryMap(m_currentEntries, inKeyStr, sourceName.getHostAddress());
 			if (status == null) {
 				hasLatestValue = false;
 				logger.info("StatusMap::hasLatestValueImpl, hasLatestValue == false, status == null");
@@ -173,7 +157,7 @@ public class StatusMap {
 							HBUtils.dateFormat(status.getUpdateTs()), HBUtils.dateFormat(inTimestamp) );
 				} else {
 					// vn: ts
-					TreeMap<Long, Long> versions = status.getVersionTsMap();
+					ConcurrentSkipListMap<Long, Long> versions = status.getVersionTsMap();
 					// if doesn't exist entry whose timestamp < inTimestamp,then row is the latest in this datacenter
 					long latestVersion = -2;
 					for (Map.Entry<Long, Long> entry : versions.entrySet()) {
@@ -198,47 +182,74 @@ public class StatusMap {
 		return hasLatestValue;
 	}
 	
-	
-	@Deprecated
-	private boolean hasLatestValueImpl(String inKSName, String inKey, long inTimestamp) {
-		boolean hasLatestValue = true;
-		Set<String> dataCenterNames = HBUtils.getDataCenterNames(inKSName);
-		dataCenterNames.remove(DatabaseDescriptor.getLocalDataCenter());
-		for (String dcName : dataCenterNames) {
-			Status status = m_currentEntries.get(inKey, dcName);
-			if (status == null) {
-				hasLatestValue = false;
-				logger.info("StatusMap::hasLatestValueImpl, hasLatestValue == false, status == null");
-			} else {
-				if (status.getUpdateTs() <= inTimestamp) {
-					hasLatestValue = false;
-					logger.info("StatusMap::hasLatestValueImpl, {}, update ts {} <= inTimestamp {}", hasLatestValue, 
-							HBUtils.dateFormat(status.getUpdateTs()), HBUtils.dateFormat(inTimestamp) );
-				} else {
-					// vn: ts
-					TreeMap<Long, Long> versions = status.getVersionTsMap();
-					// if doesn't exist entry whose timestamp < inTimestamp,
-					// then row is the latest in this datacenter
-					long latestVersion = -2;
-					for (Map.Entry<Long, Long> entry : versions.entrySet()) {
-						long vn = entry.getKey();
-						if(vn>=0) {
-							long ts = entry.getValue();
-							if (ts <= inTimestamp) {
-								hasLatestValue = false;
-								if (vn > latestVersion)
-									latestVersion = vn;
-							}
-						}
-					}
-					if (latestVersion != -2) {
-						// Wait for mutation
-						hasLatestValue = false;
-						logger.info("StatusMap::hasLatestValueImpl, hasLatestValue == false, latestVersion == ", latestVersion);
-					}
-				}
-			}
-		}
-		return hasLatestValue;
+	private Status getStatusFromEntryMap(ConcurrentHashMap<String, ConcurrentHashMap<String, Status>> inEntries, String inKey, String inSrc) {
+		Status status = null;
+		ConcurrentHashMap<String, Status> srcToStatus = inEntries.get(inKey);
+		if (srcToStatus != null)
+			status = srcToStatus.get(inSrc);
+		return status;
 	}
+	
+	private void updateEntryMapStatus(ConcurrentHashMap<String, ConcurrentHashMap<String, Status>> inEntries, String inKey, String inSrc, ConcurrentSkipListMap<Long, Long> inVnToTs, long inTs) {
+		ConcurrentHashMap<String, Status> srcToStatus = inEntries.get(inKey);
+		if (srcToStatus == null) {
+			srcToStatus = new ConcurrentHashMap<String, Status>();
+			inEntries.put(inKey, srcToStatus);
+		}
+
+		Status status = srcToStatus.get(inKey);
+		if (status == null) {
+			status = new Status(inTs, inVnToTs);
+			srcToStatus.put(inKey, status);
+		}else {
+			status.updateVnTsData(inVnToTs);
+			status.setUpdateTs(inTs);
+		}
+	}
+	
+	
+	
+	
+//	@Deprecated
+//	private boolean hasLatestValueImpl(String inKSName, String inKey, long inTimestamp) {
+//		boolean hasLatestValue = true;
+//		Set<String> dataCenterNames = HBUtils.getDataCenterNames(inKSName);
+//		dataCenterNames.remove(DatabaseDescriptor.getLocalDataCenter());
+//		for (String dcName : dataCenterNames) {
+//			Status status = m_currentEntries.get(inKey, dcName);
+//			if (status == null) {
+//				hasLatestValue = false;
+//				logger.info("StatusMap::hasLatestValueImpl, hasLatestValue == false, status == null");
+//			} else {
+//				if (status.getUpdateTs() <= inTimestamp) {
+//					hasLatestValue = false;
+//					logger.info("StatusMap::hasLatestValueImpl, {}, update ts {} <= inTimestamp {}", hasLatestValue, 
+//							HBUtils.dateFormat(status.getUpdateTs()), HBUtils.dateFormat(inTimestamp) );
+//				} else {
+//					// vn: ts
+//					TreeMap<Long, Long> versions = status.getVersionTsMap();
+//					// if doesn't exist entry whose timestamp < inTimestamp,
+//					// then row is the latest in this datacenter
+//					long latestVersion = -2;
+//					for (Map.Entry<Long, Long> entry : versions.entrySet()) {
+//						long vn = entry.getKey();
+//						if(vn>=0) {
+//							long ts = entry.getValue();
+//							if (ts <= inTimestamp) {
+//								hasLatestValue = false;
+//								if (vn > latestVersion)
+//									latestVersion = vn;
+//							}
+//						}
+//					}
+//					if (latestVersion != -2) {
+//						// Wait for mutation
+//						hasLatestValue = false;
+//						logger.info("StatusMap::hasLatestValueImpl, hasLatestValue == false, latestVersion == ", latestVersion);
+//					}
+//				}
+//			}
+//		}
+//		return hasLatestValue;
+//	}
 }

@@ -2,6 +2,7 @@ package org.apache.cassandra.heartbeat.status;
 
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
  * Status map structure: { vn-to-ts: { vn1: ts1, vn2: ts2 }, updateTs: ts }
@@ -12,21 +13,16 @@ import java.util.TreeMap;
 public class Status {
 
 	private long m_updateTs;
-	private TreeMap<Long, Long> m_vnToTs;
+	private ConcurrentSkipListMap<Long, Long> m_vnToTs;
 
-	public Status(long inUpdateTs, TreeMap<Long, Long> inVnToTs) {
+	public Status(long inUpdateTs, ConcurrentSkipListMap<Long, Long> inVnToTs) {
 		m_updateTs = inUpdateTs;
 		m_vnToTs = inVnToTs;
 		if (m_vnToTs == null) {
-			m_vnToTs = new TreeMap<Long, Long>();
+			m_vnToTs = new ConcurrentSkipListMap<Long, Long>();
 		}
 	}
-
-	public Status() {
-		m_updateTs = -1;
-		m_vnToTs = new TreeMap<Long, Long>();
-	}
-
+	
 	public void updateVnTsData(long inVersionNo, long inTimestamp) {
 		m_vnToTs.put(inVersionNo, inTimestamp);
 	}
@@ -47,7 +43,7 @@ public class Status {
 		return m_vnToTs.remove(inVersion);
 	}
 
-	public TreeMap<Long, Long> getVersionTsMap() {
+	public ConcurrentSkipListMap<Long, Long> getVersionTsMap() {
 		return m_vnToTs;
 	}
 }

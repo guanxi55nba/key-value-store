@@ -46,7 +46,7 @@ public class ReadHandler {
 	 * 
 	 * @param inMutation
 	 */
-	public synchronized void notifySubscription(Mutation inMutation) {
+	public void notifySubscription(Mutation inMutation) {
 		// Get mutation Ts
 		String ksName = inMutation.getKeyspaceName();
 		if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName)) {

@@ -200,7 +200,7 @@ public class StatusMap {
 		Status status = srcToStatus.get(inKey);
 		if (status == null) {
 			status = new Status(inTs, inVnToTs);
-			srcToStatus.put(inKey, status);
+			srcToStatus.put(inSrc, status);
 		}else {
 			status.updateVnTsData(inVnToTs);
 			status.setUpdateTs(inTs);

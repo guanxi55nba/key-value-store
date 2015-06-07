@@ -170,19 +170,24 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	}
 
 	public long getKeyVersionNo(String inKSName, ByteBuffer inKey) {
-		AtomicLong version = new AtomicLong(-1l);
+		long version = -1;
 		ConcurrentHashMap<ByteBuffer, AtomicLong> keyToVn = m_versionMaps.get(inKSName);
 		if (keyToVn == null) {
 			keyToVn = new ConcurrentHashMap<ByteBuffer, AtomicLong>();
 			m_versionMaps.put(inKSName, keyToVn);
-			keyToVn.put(inKey, version);
+			keyToVn.put(inKey, new AtomicLong(0));
+			version = 0;
 		} else {
-			AtomicLong savedVersion = keyToVn.putIfAbsent(inKey, version);
-			if(savedVersion!=null)
-				version = savedVersion;
+			AtomicLong savedVersion = keyToVn.get(inKey);
+			if (savedVersion == null) {
+				keyToVn.put(inKey, new AtomicLong(0));
+				version = 0;
+			} else {
+				version = savedVersion.incrementAndGet();
+			}
 		}
 		//logger.error("HeartBeater::getKeyVersionNo {}", atomicLong);
-		return version.incrementAndGet();
+		return version;
 	}
 
 	/**

@@ -24,10 +24,8 @@ public class HeartBeatVerbHandler implements IVerbHandler<StatusSynMsg> {
 	@Override
 	public void doVerb(MessageIn<StatusSynMsg> message, int id) {
 		if(ConfReader.instance.heartbeatEnable()) {
-			// Get datacenter name
-			InetAddress from = message.from;
 			//String srcName = DatabaseDescriptor.getEndpointSnitch().getDatacenter(from);
-			String srcName = from.getHostAddress();
+			String srcName = message.from.getHostAddress();
 			// Update multi dc status map
 			StatusMap.instance.updateStatusMap(srcName, message.payload);
 		}

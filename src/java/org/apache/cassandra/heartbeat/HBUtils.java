@@ -45,7 +45,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class HBUtils {
+	private static final String DATE_FORMAT = "yyyy-MM-dd HH:mm:ss SSS"; 
 	private static final Logger logger = LoggerFactory.getLogger(HBUtils.class);
+	
 
 	public static final List<String> SYSTEM_KEYSPACES = new ArrayList<String>(Arrays.asList("system", "system_traces"));;
 	
@@ -277,7 +279,7 @@ public class HBUtils {
 	}
 
 	public static String dateFormat(long inTs) {
-		return DateFormatUtils.format(inTs, "yyyy-MM-dd HH:mm:ss");
+		return DateFormatUtils.format(inTs, DATE_FORMAT);
 	}
 
 	/**

@@ -109,6 +109,21 @@ public class StatusSynMsg {
 		sb.append(" }");
 		return sb.toString();
 	}
+	
+	public String toStringLite() {
+		StringBuilder sb = new StringBuilder();
+		sb.append("{ ");
+		sb.append("Src: ");
+		sb.append(srcName);
+		sb.append(", ");
+		sb.append("TS: ");
+		sb.append(HBUtils.dateFormat(timestamp));
+		sb.append(" }");
+		sb.append(", ");
+		sb.append("Size: ");
+		sb.append(m_data.size());
+		return sb.toString();
+	}
 
 	public String getSrcName() {
 		return srcName;

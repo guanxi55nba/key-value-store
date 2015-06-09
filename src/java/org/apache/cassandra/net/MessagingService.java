@@ -741,7 +741,7 @@ public final class MessagingService implements MessagingServiceMBean
         }
         
 		if (message.payload instanceof StatusSynMsg && ConfReader.instance.heartbeatEnable() && ConfReader.instance.isLogEnabled()) {
-			logger.info("Receive status SynMsg " + ((StatusSynMsg) message.payload).toString());
+			logger.info("Receive status SynMsg " + ((StatusSynMsg) message.payload).toStringLite());
 		}
 
         Runnable runnable = new MessageDeliveryTask(message, id, timestamp);

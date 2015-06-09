@@ -65,7 +65,7 @@ public class ReadHandler {
 	 * 
 	 * @param inMsg
 	 */
-	public void notifySubscription(StatusSynMsg inMsg) {
+	public void notifySubscription(final StatusSynMsg inMsg) {
 		String ksName = ConfReader.instance.getKeySpaceName();
 		TreeMap<String, TreeMap<Long, Long>> data = inMsg.getData();
 		for (String key : data.keySet()) {
@@ -125,7 +125,7 @@ public class ReadHandler {
 			} else {
 				logger.error("StatusMap::hasLatestValue, Unkonw pageable type");
 			}
-			logger.info("sinkReadHandler: [ Pageable: {}, Timestamp: {} ", page, DateFormatUtils.format(inTimestamp, "yyyy-MM-dd HH:mm:ss"));
+			logger.info("sinkReadHandler: [ Pageable: {}, Timestamp: {} ", page, HBUtils.dateFormat(inTimestamp));
 		} else {
 			logger.info("ReadHandler::sinkReadHandler, page is null");
 		}

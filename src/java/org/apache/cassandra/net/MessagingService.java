@@ -219,6 +219,7 @@ public final class MessagingService implements MessagingServiceMBean
         put(Verb.PAXOS_PREPARE, Commit.serializer);
         put(Verb.PAXOS_PROPOSE, Commit.serializer);
         put(Verb.PAXOS_COMMIT, Commit.serializer);
+        put(Verb.HEARTBEAT_DIGEST, StatusSynMsg.serializer);
     }};
 
     /**

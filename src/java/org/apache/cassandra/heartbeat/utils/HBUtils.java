@@ -49,7 +49,7 @@ public class HBUtils {
 	private static final Logger logger = LoggerFactory.getLogger(HBUtils.class);
 	
 
-	public static final List<String> SYSTEM_KEYSPACES = new ArrayList<String>(Arrays.asList("system", "system_traces"));;
+	public static final List<String> SYSTEM_KEYSPACES = new ArrayList<String>(Arrays.asList("system", "system_traces", "system_auth"));;
 	
 	private static InetAddress localInetAddress;
 

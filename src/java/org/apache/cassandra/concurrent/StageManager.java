@@ -56,6 +56,7 @@ public class StageManager
         stages.put(Stage.MIGRATION, new JMXEnabledThreadPoolExecutor(Stage.MIGRATION));
         stages.put(Stage.MISC, new JMXEnabledThreadPoolExecutor(Stage.MISC));
         stages.put(Stage.READ_REPAIR, multiThreadedStage(Stage.READ_REPAIR, FBUtilities.getAvailableProcessors()));
+        stages.put(Stage.HEARTBEAT, new JMXEnabledThreadPoolExecutor(Stage.HEARTBEAT));
         stages.put(Stage.TRACING, tracingExecutor());
     }
 

@@ -113,7 +113,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 
 	public void start() {
 		if (enable) {
-			logger.info("Starting up server heartbeater: { dc:{}, interval: {}, logenabled: {} ", DatabaseDescriptor.getLocalDataCenter(), ConfReader.instance.getHeartbeatInterval(), ConfReader.instance.isLogEnabled());
+			logger.info("Starting up server heartbeater: { dc:{}, interval: {}, logenabled: {} }", DatabaseDescriptor.getLocalDataCenter(), ConfReader.instance.getHeartbeatInterval(), ConfReader.instance.isLogEnabled());
 			initializeStatusMsg();
 			logger.info("Schedule task to send out heartbeat if needed");
 			scheduledHeartBeatTask = executor.scheduleWithFixedDelay(new HeartBeatTask(), HeartBeater.intervalInMillis, HeartBeater.intervalInMillis, TimeUnit.MILLISECONDS);

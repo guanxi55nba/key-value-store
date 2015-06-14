@@ -179,6 +179,7 @@ public final class MessagingService implements MessagingServiceMBean
         put(Verb.COUNTER_MUTATION, Stage.MUTATION);
         put(Verb.SNAPSHOT, Stage.MISC);
         put(Verb.ECHO, Stage.GOSSIP);
+        put(Verb.HEARTBEAT_DIGEST, Stage.HEARTBEAT);
 
         put(Verb.UNUSED_1, Stage.INTERNAL_RESPONSE);
         put(Verb.UNUSED_2, Stage.INTERNAL_RESPONSE);

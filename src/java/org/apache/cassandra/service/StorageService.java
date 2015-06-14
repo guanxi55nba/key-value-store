@@ -108,6 +108,8 @@ import org.apache.cassandra.gms.IEndpointStateChangeSubscriber;
 import org.apache.cassandra.gms.IFailureDetector;
 import org.apache.cassandra.gms.TokenSerializer;
 import org.apache.cassandra.gms.VersionedValue;
+import org.apache.cassandra.heartbeat.HeartBeatVerbHandler;
+import org.apache.cassandra.heartbeat.utils.ConfReader;
 import org.apache.cassandra.io.sstable.SSTableDeletingTask;
 import org.apache.cassandra.io.sstable.SSTableLoader;
 import org.apache.cassandra.io.util.FileUtils;
@@ -335,6 +337,9 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
 
         MessagingService.instance().registerVerbHandlers(MessagingService.Verb.SNAPSHOT, new SnapshotVerbHandler());
         MessagingService.instance().registerVerbHandlers(MessagingService.Verb.ECHO, new EchoVerbHandler());
+        if(ConfReader.instance.heartbeatEnable()) {
+        	MessagingService.instance().registerVerbHandlers(MessagingService.Verb.HEARTBEAT_DIGEST, new HeartBeatVerbHandler());
+        }
     }
 
     public void registerDaemon(CassandraDaemon daemon)

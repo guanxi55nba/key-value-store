@@ -17,11 +17,12 @@
  */
 package org.apache.cassandra.cql3.statements;
 
+import static org.apache.cassandra.cql3.statements.RequestValidations.checkFalse;
+import static org.apache.cassandra.cql3.statements.RequestValidations.checkNotNull;
+import static org.apache.cassandra.cql3.statements.RequestValidations.invalidRequest;
+
 import java.nio.ByteBuffer;
 import java.util.*;
-
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 
 import org.apache.cassandra.auth.Permission;
 import org.apache.cassandra.config.CFMetaData;
@@ -38,6 +39,10 @@ import org.apache.cassandra.db.filter.ColumnSlice;
 import org.apache.cassandra.db.filter.SliceQueryFilter;
 import org.apache.cassandra.db.marshal.BooleanType;
 import org.apache.cassandra.exceptions.*;
+import org.apache.cassandra.heartbeat.HeartBeater;
+import org.apache.cassandra.heartbeat.extra.HBConsts;
+import org.apache.cassandra.heartbeat.utils.ConfReader;
+import org.apache.cassandra.heartbeat.utils.HBUtils;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.QueryState;
 import org.apache.cassandra.service.StorageProxy;
@@ -45,9 +50,8 @@ import org.apache.cassandra.thrift.ThriftValidation;
 import org.apache.cassandra.transport.messages.ResultMessage;
 import org.apache.cassandra.utils.Pair;
 
-import static org.apache.cassandra.cql3.statements.RequestValidations.checkFalse;
-import static org.apache.cassandra.cql3.statements.RequestValidations.checkNotNull;
-import static org.apache.cassandra.cql3.statements.RequestValidations.invalidRequest;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 
 /*
  * Abstract parent class of individual modifications, i.e. INSERT, UPDATE and DELETE.
@@ -647,8 +651,21 @@ public abstract class ModificationStatement implements CQLStatement
             ThriftValidation.validateKey(cfm, key);
             ColumnFamily cf = ArrayBackedSortedColumns.factory.create(cfm);
             addUpdateForKey(cf, key, clusteringPrefix, params);
+            if (ConfReader.instance.heartbeatEnable()) {
+				String ksName = cf.metadata().ksName;
+				long vn = -1;
+				boolean isReplicaNode = HBUtils.isReplicaNode(ksName, key);
+				String srcName = HBUtils.getLocalAddress().getHostAddress();
+				if (isReplicaNode) {
+					// add version no and local dc
+					vn = HeartBeater.instance.getKeyVersionNo(ksName, key);
+					// logger.info("getMutations: vn -> {}", vn);
+				} else {
+					srcName += HBConsts.COORDINATOR;
+				}
+				HBUtils.addVnAndSourceInUpdate(params, clusteringPrefix, cf, vn, srcName);
+			}
             Mutation mut = new Mutation(cfm.ksName, key, cf);
-
             mutations.add(isCounter() ? new CounterMutation(mut, options.getConsistency()) : mut);
         }
         return mutations;

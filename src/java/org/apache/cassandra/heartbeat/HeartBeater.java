@@ -13,6 +13,7 @@ import javax.management.ObjectName;
 
 import org.apache.cassandra.concurrent.DebuggableScheduledThreadPoolExecutor;
 import org.apache.cassandra.config.CFMetaData;
+import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.cql3.UntypedResultSet.Row;
 import org.apache.cassandra.db.ColumnFamily;
@@ -112,7 +113,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 
 	public void start() {
 		if (enable) {
-			logger.info("Starting up server heartbeater");
+			logger.info("Starting up server heartbeater: { dc:{}, interval: {}, logenabled: {} ", DatabaseDescriptor.getLocalDataCenter(), ConfReader.instance.getHeartbeatInterval(), ConfReader.instance.isLogEnabled());
 			initializeStatusMsg();
 			logger.info("Schedule task to send out heartbeat if needed");
 			scheduledHeartBeatTask = executor.scheduleWithFixedDelay(new HeartBeatTask(), HeartBeater.intervalInMillis, HeartBeater.intervalInMillis, TimeUnit.MILLISECONDS);

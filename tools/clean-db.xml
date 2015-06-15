@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<project name="cassandra-snapshot" basedir=".">
+
+
+<property name="data.location" location="../data" />
+
+
+<target name="clean call data">
+	<echo message="Clean all files in ${data.location} " />
+	<delete includeEmptyDirs="true">
+	  <fileset dir="${data.location}" includes="**/*" defaultexcludes="no"/>
+	</delete>
+</target>
+
+</project>

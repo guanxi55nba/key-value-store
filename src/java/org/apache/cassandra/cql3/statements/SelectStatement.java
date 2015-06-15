@@ -42,6 +42,10 @@ import org.apache.cassandra.db.index.SecondaryIndexManager;
 import org.apache.cassandra.db.marshal.*;
 import org.apache.cassandra.dht.*;
 import org.apache.cassandra.exceptions.*;
+import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
+import org.apache.cassandra.heartbeat.status.StatusMap;
+import org.apache.cassandra.heartbeat.utils.ConfReader;
+import org.apache.cassandra.heartbeat.utils.HBUtils;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.QueryState;
 import org.apache.cassandra.service.StorageProxy;
@@ -63,8 +67,8 @@ import org.slf4j.LoggerFactory;
 public class SelectStatement implements CQLStatement
 {
     private static final Logger logger = LoggerFactory.getLogger(SelectStatement.class);
-
     private static final int DEFAULT_COUNT_PAGE_SIZE = 10000;
+    private byte[] lock = new byte[0];
 
     /**
      * In the current version a query containing duplicate values in an IN restriction on the partition key will
@@ -203,6 +207,34 @@ public class SelectStatement implements CQLStatement
         // Note that if there are some nodes in the cluster with a version less than 2.0, we can't use paging (CASSANDRA-6707).
         if (parameters.isCount && pageSize <= 0)
             pageSize = DEFAULT_COUNT_PAGE_SIZE;
+        
+    	if (ConfReader.instance.heartbeatEnable()) {
+			Set<String> ksNames = HBUtils.getReadCommandRelatedKeySpaceNames(command);
+			boolean superset = true;
+			for (String ks : ksNames) {
+				if (!HBUtils.SYSTEM_KEYSPACES.contains(ks)) {
+					superset = false;
+					break;
+				}
+			}
+			if (!superset) {
+				if (StatusMap.instance.hasLatestValue(command, now)) {
+					logger.info("execute: hasLatestValue -> {}", "true");
+				} else {
+					logger.info("execute: hasLatestValue -> {}", "false");
+					// sink subscription
+					synchronized (lock) {
+						try {
+							ReadHandler.instance.sinkReadHandler(command, now, lock);
+							lock.wait();
+							logger.info("[WaitingThread]: Successfully notified!");
+						} catch (Exception e) {
+							logger.error("Exception: {}", e.getMessage());
+						}
+					}
+				}
+			}
+		}
 
         if (pageSize <= 0 || command == null || !QueryPagers.mayNeedPaging(command, pageSize))
         {

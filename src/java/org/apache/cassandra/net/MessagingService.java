@@ -38,7 +38,6 @@ import com.google.common.collect.Sets;
 import org.cliffc.high_scale_lib.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.apache.cassandra.concurrent.ScheduledExecutors;
 import org.apache.cassandra.concurrent.Stage;
 import org.apache.cassandra.concurrent.StageManager;
@@ -52,6 +51,7 @@ import org.apache.cassandra.gms.EchoMessage;
 import org.apache.cassandra.gms.GossipDigestAck;
 import org.apache.cassandra.gms.GossipDigestAck2;
 import org.apache.cassandra.gms.GossipDigestSyn;
+import org.apache.cassandra.heartbeat.StatusSynMsg;
 import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.io.util.FileUtils;
@@ -135,7 +135,8 @@ public final class MessagingService implements MessagingServiceMBean
         UNUSED_1,
         UNUSED_2,
         UNUSED_3,
-        ;
+        HEARTBEAT_DIGEST,
+        HEARTBEAT_SHOWDOWN;
     }
 
     public static final EnumMap<MessagingService.Verb, Stage> verbStages = new EnumMap<MessagingService.Verb, Stage>(MessagingService.Verb.class)
@@ -179,6 +180,7 @@ public final class MessagingService implements MessagingServiceMBean
         put(Verb.COUNTER_MUTATION, Stage.MUTATION);
         put(Verb.SNAPSHOT, Stage.MISC);
         put(Verb.ECHO, Stage.GOSSIP);
+        put(Verb.HEARTBEAT_DIGEST, Stage.HEARTBEAT);
 
         put(Verb.UNUSED_1, Stage.INTERNAL_RESPONSE);
         put(Verb.UNUSED_2, Stage.INTERNAL_RESPONSE);
@@ -218,6 +220,7 @@ public final class MessagingService implements MessagingServiceMBean
         put(Verb.PAXOS_PREPARE, Commit.serializer);
         put(Verb.PAXOS_PROPOSE, Commit.serializer);
         put(Verb.PAXOS_COMMIT, Commit.serializer);
+        put(Verb.HEARTBEAT_DIGEST, StatusSynMsg.serializer);
     }};
 
     /**

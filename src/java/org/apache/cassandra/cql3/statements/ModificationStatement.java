@@ -34,6 +34,10 @@ import org.apache.cassandra.db.filter.ColumnSlice;
 import org.apache.cassandra.db.filter.SliceQueryFilter;
 import org.apache.cassandra.db.marshal.BooleanType;
 import org.apache.cassandra.exceptions.*;
+import org.apache.cassandra.heartbeat.HeartBeater;
+import org.apache.cassandra.heartbeat.extra.HBConsts;
+import org.apache.cassandra.heartbeat.utils.ConfReader;
+import org.apache.cassandra.heartbeat.utils.HBUtils;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.QueryState;
 import org.apache.cassandra.service.StorageProxy;
@@ -647,13 +651,29 @@ public abstract class ModificationStatement implements CQLStatement
         UpdateParameters params = makeUpdateParameters(keys, clusteringPrefix, options, local, now);
 
         Collection<IMutation> mutations = new ArrayList<IMutation>(keys.size());
+        
+        
         for (ByteBuffer key: keys)
         {
             ThriftValidation.validateKey(cfm, key);
             ColumnFamily cf = ArrayBackedSortedColumns.factory.create(cfm);
             addUpdateForKey(cf, key, clusteringPrefix, params);
+			if (ConfReader.instance.heartbeatEnable()) {
+				String ksName = cf.metadata().ksName;
+				long vn = -1;
+				boolean isReplicaNode = HBUtils.isReplicaNode(ksName, key);
+				String srcName = HBUtils.getLocalAddress().getHostAddress();
+				if (isReplicaNode) {
+					// add version no and local dc
+					vn = HeartBeater.instance.getKeyVersionNo(ksName, key);
+					// logger.info("getMutations: vn -> {}", vn);
+				} else {
+					srcName += HBConsts.COORDINATOR;
+				}
+				HBUtils.addVnAndSourceInUpdate(params, clusteringPrefix, cf,
+						vn, srcName);
+			}
             Mutation mut = new Mutation(cfm.ksName, key, cf);
-
             mutations.add(isCounter() ? new CounterMutation(mut, options.getConsistency()) : mut);
         }
         return mutations;

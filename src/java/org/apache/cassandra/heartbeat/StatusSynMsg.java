@@ -5,7 +5,6 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
@@ -30,7 +29,7 @@ public class StatusSynMsg
     final String ksName;
     final String srcName;
     long timestamp;
-    private ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> m_data = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>();
+    private volatile ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> m_data = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>();
     //Random randomGenerator = new Random();
 
     public StatusSynMsg(String ksName, String srcName, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> data, long timestamp)
@@ -58,7 +57,9 @@ public class StatusSynMsg
         if (vnTsMap == null)
         {
             vnTsMap = new ConcurrentSkipListMap<Long, Long>();
+//            synchronized (m_data){
                 m_data.put(key, vnTsMap);
+//            }
         }
         vnTsMap.put(version, timestamp);
     }
@@ -107,8 +108,12 @@ public class StatusSynMsg
      */
     public void cleanData()
     {
-        for (ConcurrentSkipListMap<Long, Long> vnTsMap : m_data.values())
+        for (ConcurrentSkipListMap<Long, Long> vnTsMap : m_data.values()){
+//            synchronized (m_data)
+//            {
                 vnTsMap.clear();
+//            }
+        }
     }
 
     public String toString()
@@ -174,6 +179,17 @@ public class StatusSynMsg
     {
         return new StatusSynMsg(ksName, srcName, m_data, timestamp);
     }
+    
+    public ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> dataCopy(){
+        ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> dataCopy = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long,Long>>();
+        for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : m_data.entrySet())
+        {
+            ConcurrentSkipListMap<Long, Long> result = dataCopy.putIfAbsent(entry.getKey(),new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
+            if (result != null)
+                result.putAll(entry.getValue());
+        }
+        return dataCopy;
+    }
 }
 
 class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
@@ -184,11 +200,12 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
         out.writeUTF(msg.ksName);
         out.writeUTF(msg.srcName);
         out.writeLong(msg.getTimestamp());
-        int dataSize = msg.getData().size();
+        ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> dataCopy = msg.dataCopy();
+        int dataSize = dataCopy.size();
         out.writeInt(dataSize);
         if (dataSize > 0)
         {
-            for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : msg.getDataImpl().entrySet())
+            for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : dataCopy.entrySet())
             {
                 out.writeUTF(entry.getKey());
                 int valueSize = entry.getValue().size();

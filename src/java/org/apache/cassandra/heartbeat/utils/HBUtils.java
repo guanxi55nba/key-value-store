@@ -93,16 +93,33 @@ public class HBUtils {
 	}
 
 	/**
-	 * Get the replica node ip address based on the partition key
+	 * Get the replica node ip addresses based on the partition key exception local address
 	 * 
 	 * @param key
 	 * @return Replica nodes' ip address list
 	 */
 	public static List<InetAddress> getReplicaList(String inKeySpaceName, ByteBuffer key) {
-		@SuppressWarnings("rawtypes")
-		Token tk = StorageService.getPartitioner().getToken(key);
-		return StorageService.instance.getNaturalEndpoints(inKeySpaceName, tk);
+		return getReplicaList(inKeySpaceName, key, true);
 	}
+	
+	/**
+	 * Get the replica node ip addresses based on the partition key
+	 * 
+	 * @param inKeySpaceName
+	 * @param key
+	 * @param inFilterLocal whether remove local ip address
+	 * @return
+	 */
+	public static List<InetAddress> getReplicaList(String inKeySpaceName, ByteBuffer key, boolean inFilterLocal) {
+	    Token tk = StorageService.getPartitioner().getToken(key);
+	    List<InetAddress> replicaList = StorageService.instance.getNaturalEndpoints(inKeySpaceName, tk);
+        if (inFilterLocal)
+        {
+            replicaList.remove(getLocalAddress());
+        }
+	    return replicaList;
+	}
+	
 
 	/**
 	 * Get all the local saved data's partition keys
@@ -316,7 +333,7 @@ public class HBUtils {
 	}
 	
 	public static boolean isReplicaNode(String inKeySpaceName, ByteBuffer key) {
-		return getReplicaList(inKeySpaceName, key).contains(getLocalAddress());
+		return getReplicaList(inKeySpaceName, key, false).contains(getLocalAddress());
 	}
 	
 	

@@ -101,11 +101,11 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 					MessagingService.instance().sendOneWay(finalMsg, destination);
 					if(ConfReader.instance.isLogEnabled())
 						logger.info("Send out status msg to {} with msg {}", destination, statusSynMsg);
+					
+					// clear status syn msg once is sent out
+					statusSynMsg.cleanData();
 				}
 			}
-
-			// Clear status map
-			clearStatusMap();
 		}
 	}
 
@@ -237,7 +237,6 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	 */
 	private void updateStatusMsgMap(String inKSName, String inCFName, ByteBuffer partitionKey, Long version, long timestamp) {
 		List<InetAddress> replicaList = HBUtils.getReplicaList(inKSName, partitionKey);
-		replicaList.remove(replicaList.remove(HBUtils.getLocalAddress()));
 		CFMetaData cfMetaData = Schema.instance.getKSMetaData(inKSName).cfMetaData().get(inCFName);
 		for (InetAddress inetAddress : replicaList) {
 			StatusSynMsg statusMsgSyn = m_statusMsgMap.get(inetAddress);
@@ -246,15 +245,6 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 				m_statusMsgMap.put(inetAddress, statusMsgSyn);
 			}
 			statusMsgSyn.addKeyVersion(HBUtils.byteBufferToString(cfMetaData, partitionKey), version, timestamp);
-		}
-	}
-
-	/**
-	 * Called by {@link HeartbeatTask.run}
-	 */
-	private void clearStatusMap() {
-		for (StatusSynMsg msg : m_statusMsgMap.values()) {
-			msg.cleanData();
 		}
 	}
 }

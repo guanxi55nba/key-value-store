@@ -4,7 +4,6 @@ import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
@@ -144,7 +143,6 @@ public class StatusMap {
 	private boolean hasLatestValueImpl(String inKSName,String inKeyStr, ByteBuffer inKey, long inTimestamp) {
 		boolean hasLatestValue = true;
 		List<InetAddress> replicaList = HBUtils.getReplicaList(inKSName, inKey);
-		replicaList.remove(HBUtils.getLocalAddress());
 		for (InetAddress sourceName : replicaList) {
 			Status status = getStatusFromEntryMap(m_currentEntries, inKeyStr, sourceName.getHostAddress());
 			if (status == null) {

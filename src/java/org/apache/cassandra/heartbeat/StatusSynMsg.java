@@ -31,8 +31,7 @@ public class StatusSynMsg
     long timestamp;
     private ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> m_data;
 
-    public StatusSynMsg(String ksName, String srcName,
-            ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> data, long timestamp)
+    public StatusSynMsg(String ksName, String srcName, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> data, long timestamp)
     {
         this.ksName = ksName;
         this.srcName = srcName;
@@ -172,7 +171,7 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
         out.writeUTF(msg.ksName);
         out.writeUTF(msg.srcName);
         out.writeLong(msg.getTimestamp());
-        int dataSize = msg.getDataImpl().size();
+        int dataSize = msg.getData().size();
         out.writeInt(dataSize);
         if (dataSize > 0)
         {
@@ -237,7 +236,7 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
         long size = TypeSizes.NATIVE.sizeof(statusMsgSyn.ksName);
         size += TypeSizes.NATIVE.sizeof(statusMsgSyn.srcName);
         size += TypeSizes.NATIVE.sizeof(statusMsgSyn.getTimestamp());
-        int dataSize = statusMsgSyn.getDataImpl().size();
+        int dataSize = statusMsgSyn.getData().size();
         size += TypeSizes.NATIVE.sizeof(dataSize);
         if (dataSize > 0)
         {

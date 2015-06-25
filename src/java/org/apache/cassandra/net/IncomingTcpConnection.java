@@ -36,7 +36,6 @@ import org.xerial.snappy.SnappyInputStream;
 import org.apache.cassandra.config.Config;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.UnknownColumnFamilyException;
-import org.apache.cassandra.gms.Gossiper;
 
 public class IncomingTcpConnection extends Thread implements Closeable
 {
@@ -90,6 +89,7 @@ public class IncomingTcpConnection extends Thread implements Closeable
         catch (EOFException e)
         {
             logger.trace("eof reading from socket; closing", e);
+            logger.info("eof reading from socket; closing", e);
             // connection will be reset so no need to throw an exception.
         }
         catch (UnknownColumnFamilyException e)
@@ -99,6 +99,7 @@ public class IncomingTcpConnection extends Thread implements Closeable
         catch (IOException e)
         {
             logger.debug("IOException reading from socket; closing", e);
+            logger.info("IOException reading from socket; closing", e);
         }
         finally
         {

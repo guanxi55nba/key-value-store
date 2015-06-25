@@ -48,14 +48,14 @@ public class StatusMap {
 	 */
 	public void updateStatusMap(String inSrcName, final StatusSynMsg inSynMsg) {
 		if (inSynMsg != null) {
-			TreeMap<String, TreeMap<Long, Long>> statusData = inSynMsg.getData();
-			for (Map.Entry<String, TreeMap<Long, Long>> entry : statusData.entrySet()) {
+		    ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> statusData = inSynMsg.getData();
+			for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : statusData.entrySet()) {
 				String key = entry.getKey();
 
 				// Filter the status in the removed entries
 				Status removedStatus = getStatusFromEntryMap(m_removedEntries, key, inSrcName);
 				ConcurrentSkipListMap<Long, Long> removedVnToTs = removedStatus == null ? new ConcurrentSkipListMap<Long, Long>() : removedStatus.getVersionTsMap();
-				TreeMap<Long, Long> valueMap = entry.getValue();
+				ConcurrentSkipListMap<Long, Long> valueMap = entry.getValue();
 				ConcurrentSkipListMap<Long, Long> vn_ts = new ConcurrentSkipListMap<Long, Long>();
 				if (removedVnToTs == null || removedVnToTs.size() == 0) {
 					vn_ts.putAll(valueMap);

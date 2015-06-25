@@ -292,6 +292,7 @@ public class OutboundTcpConnection extends Thread
             {
                 if (logger.isDebugEnabled())
                     logger.debug("error writing to {}", poolReference.endPoint(), e);
+                logger.info("unable to connect to " + poolReference.endPoint(), e);
 
                 // if the message was important, such as a repair acknowledgement, put it back on the queue
                 // to retry after re-connecting.  See CASSANDRA-5393

@@ -66,7 +66,7 @@ public class ReadHandler {
 	 */
 	public void notifySubscription(StatusSynMsg inMsg) {
 		String ksName = ConfReader.instance.getKeySpaceName();
-		TreeMap<String, TreeMap<Long, Long>> data = inMsg.getData();
+		ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> data = inMsg.getData();
 		for (String key : data.keySet()) {
 			notifySubscription(ksName, key, inMsg.getTimestamp());
 		}

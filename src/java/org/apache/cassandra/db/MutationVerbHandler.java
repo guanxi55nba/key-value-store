@@ -21,21 +21,28 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 
+import org.apache.cassandra.io.util.FastByteArrayInputStream;
+import org.apache.cassandra.net.CompactEndpointSerializationHelper;
+import org.apache.cassandra.net.IVerbHandler;
+import org.apache.cassandra.net.MessageIn;
+import org.apache.cassandra.net.MessageOut;
+import org.apache.cassandra.net.MessagingService;
+import org.apache.cassandra.tracing.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.apache.cassandra.io.util.FastByteArrayInputStream;
-import org.apache.cassandra.net.*;
-import org.apache.cassandra.tracing.Tracing;
 
 public class MutationVerbHandler implements IVerbHandler<Mutation>
 {
     private static final Logger logger = LoggerFactory.getLogger(MutationVerbHandler.class);
+    //private static AtomicInteger m_counter = new AtomicInteger(0);
 
     public void doVerb(MessageIn<Mutation> message, int id)
     {
         try
         {
+//			if (!HBUtils.SYSTEM_KEYSPACES.contains(message.payload.getKeyspaceName())) {
+//				logger.info("mutation number {}", m_counter.incrementAndGet());
+//			}
             // Check if there were any forwarding headers in this message
             byte[] from = message.parameters.get(Mutation.FORWARD_FROM);
             InetAddress replyTo;

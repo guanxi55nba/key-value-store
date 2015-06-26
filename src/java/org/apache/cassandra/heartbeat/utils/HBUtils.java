@@ -13,6 +13,7 @@ import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.ColumnDefinition;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.config.Schema;
+import org.apache.cassandra.cql3.ColumnIdentifier;
 import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.cql3.UntypedResultSet;
 import org.apache.cassandra.cql3.UntypedResultSet.Row;
@@ -98,7 +99,7 @@ public class HBUtils {
 	 * @param key
 	 * @return Replica nodes' ip address list
 	 */
-	public static List<InetAddress> getReplicaList(String inKeySpaceName, ByteBuffer key) {
+	public static List<InetAddress> getReplicaListExcludeLocal(String inKeySpaceName, ByteBuffer key) {
 		return getReplicaList(inKeySpaceName, key, true);
 	}
 	
@@ -111,12 +112,9 @@ public class HBUtils {
 	 * @return
 	 */
 	public static List<InetAddress> getReplicaList(String inKeySpaceName, ByteBuffer key, boolean inFilterLocal) {
-	    Token tk = StorageService.getPartitioner().getToken(key);
-	    List<InetAddress> replicaList = StorageService.instance.getNaturalEndpoints(inKeySpaceName, tk);
+	    List<InetAddress> replicaList = StorageService.instance.getNaturalEndpoints(inKeySpaceName, key);
         if (inFilterLocal)
-        {
             replicaList.remove(getLocalAddress());
-        }
 	    return replicaList;
 	}
 	
@@ -316,21 +314,39 @@ public class HBUtils {
 			ByteBuffer vnColName = ByteBufferUtil.bytes(HBConsts.VERSON_NO);
 			ColumnDefinition vnColDef = cf.metadata().getColumnDefinition(vnColName);
 			CellName vnCellName = cf.getComparator().create(clusteringPrefix, vnColDef);
-			if(cf.getColumn(vnCellName)==null) {
-				ByteBuffer vnCellValue = ByteBufferUtil.bytes(vn);
-				cf.addColumn(params.makeColumn(vnCellName, vnCellValue));
-			}
+            if (cf.getColumn(vnCellName) == null)
+            {
+                ByteBuffer vnCellValue = ByteBufferUtil.bytes(vn);
+                cf.addColumn(vnCellName, vnCellValue, params.timestamp);
+            }
 
 			// Add local dc
 			ByteBuffer dcColName = ByteBufferUtil.bytes(HBConsts.SOURCE);
 			ColumnDefinition dcColDef = cf.metadata().getColumnDefinition(dcColName);
 			CellName dcCellName = cf.getComparator().create(clusteringPrefix, dcColDef);
-			if(cf.getColumn(dcCellName)==null) {
-				ByteBuffer dcCellValue = ByteBufferUtil.bytes(srcName);
-				cf.addColumn(params.makeColumn(dcCellName, dcCellValue));
-			}
+            if (cf.getColumn(dcCellName) == null)
+            {
+                ByteBuffer dcCellValue = ByteBufferUtil.bytes(srcName);
+                cf.addColumn(dcCellName, dcCellValue, params.timestamp);
+            }
 		}
 	}
+	
+    public static CellName getCellNameFromCF(ColumnFamily inCF, String inCellName)
+    {
+        CellName cellName = null;
+        CFMetaData metaData = inCF.metadata();
+        for (Cell cell : inCF.getReverseSortedColumns())
+        {
+            CellName name = cell.name();
+            if (inCellName.equals(name.cql3ColumnName(metaData).toString()))
+            {
+                cellName = name;
+                break;
+            }
+        }
+        return cellName;
+    }
 	
 	public static boolean isReplicaNode(String inKeySpaceName, ByteBuffer key) {
 		return getReplicaList(inKeySpaceName, key, false).contains(getLocalAddress());

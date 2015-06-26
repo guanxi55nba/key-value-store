@@ -169,26 +169,18 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 		}
 	}
 
-	public long getKeyVersionNo(String inKSName, ByteBuffer inKey) {
-		long version = -1;
-		ConcurrentHashMap<ByteBuffer, AtomicLong> keyToVn = m_versionMaps.get(inKSName);
-		if (keyToVn == null) {
-			keyToVn = new ConcurrentHashMap<ByteBuffer, AtomicLong>();
-			m_versionMaps.put(inKSName, keyToVn);
-			keyToVn.put(inKey, new AtomicLong(0));
-			version = 0;
-		} else {
-			AtomicLong savedVersion = keyToVn.get(inKey);
-			if (savedVersion == null) {
-				keyToVn.put(inKey, new AtomicLong(0));
-				version = 0;
-			} else {
-				version = savedVersion.incrementAndGet();
-			}
-		}
-		//logger.error("HeartBeater::getKeyVersionNo {}", atomicLong);
-		return version;
-	}
+    public long getKeyVersionNo(String inKSName, ByteBuffer inKey)
+    {
+        AtomicLong version = new AtomicLong(-1);
+        ConcurrentHashMap<ByteBuffer, AtomicLong> newMap = new ConcurrentHashMap<ByteBuffer, AtomicLong>();
+        ConcurrentHashMap<ByteBuffer, AtomicLong> keyToVn = m_versionMaps.putIfAbsent(inKSName, newMap);
+        if (keyToVn == null)
+            keyToVn = newMap;
+        AtomicLong savedVersion = keyToVn.putIfAbsent(inKey, version);
+        if (savedVersion == null)
+            savedVersion = version;
+        return savedVersion.incrementAndGet();
+    }
 
 	/**
 	 * Called by {@link HeartBeater::start}
@@ -236,7 +228,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 	 * @param timestamp
 	 */
 	private void updateStatusMsgMap(String inKSName, String inCFName, ByteBuffer partitionKey, Long version, long timestamp) {
-		List<InetAddress> replicaList = HBUtils.getReplicaList(inKSName, partitionKey);
+		List<InetAddress> replicaList = HBUtils.getReplicaListExcludeLocal(inKSName, partitionKey);
 		CFMetaData cfMetaData = Schema.instance.getKSMetaData(inKSName).cfMetaData().get(inCFName);
 		for (InetAddress inetAddress : replicaList) {
 			StatusSynMsg statusMsgSyn = m_statusMsgMap.get(inetAddress);

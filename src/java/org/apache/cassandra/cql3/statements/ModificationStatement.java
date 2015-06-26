@@ -658,19 +658,19 @@ public abstract class ModificationStatement implements CQLStatement
             ThriftValidation.validateKey(cfm, key);
             ColumnFamily cf = ArrayBackedSortedColumns.factory.create(cfm);
             addUpdateForKey(cf, key, clusteringPrefix, params);
-			if (ConfReader.instance.heartbeatEnable()) {
-				String ksName = cf.metadata().ksName;
-				long vn = -1;
-				boolean isReplicaNode = HBUtils.isReplicaNode(ksName, key);
-				String srcName = HBUtils.getLocalAddress().getHostAddress();
-				
-				if (isReplicaNode) {
-					// add version no and local dc
-					vn = HeartBeater.instance.getKeyVersionNo(ksName, key);
-					// logger.info("getMutations: vn -> {}", vn);
-				}
-				HBUtils.addVnAndSourceInUpdate(params, clusteringPrefix, cf, vn, isReplicaNode?srcName:srcName+HBConsts.COORDINATOR);
-			}
+            if (ConfReader.instance.heartbeatEnable())
+            {
+                String ksName = cf.metadata().ksName;
+                long vn = -1;
+                boolean isReplicaNode = HBUtils.isReplicaNode(ksName, key);
+                String srcName = HBUtils.getLocalAddress().getHostAddress();
+                if (isReplicaNode){
+                    vn = HeartBeater.instance.getKeyVersionNo(ksName, key);
+                }else{
+                    srcName = srcName+ HBConsts.COORDINATOR;
+                }
+                HBUtils.addVnAndSourceInUpdate(params, clusteringPrefix, cf, vn, srcName);
+            }
             Mutation mut = new Mutation(cfm.ksName, key, cf);
             mutations.add(isCounter() ? new CounterMutation(mut, options.getConsistency()) : mut);
         }

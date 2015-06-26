@@ -142,7 +142,7 @@ public class StatusMap {
 	
 	private boolean hasLatestValueImpl(String inKSName,String inKeyStr, ByteBuffer inKey, long inTimestamp) {
 		boolean hasLatestValue = true;
-		List<InetAddress> replicaList = HBUtils.getReplicaList(inKSName, inKey);
+		List<InetAddress> replicaList = HBUtils.getReplicaListExcludeLocal(inKSName, inKey);
 		for (InetAddress sourceName : replicaList) {
 			Status status = getStatusFromEntryMap(m_currentEntries, inKeyStr, sourceName.getHostAddress());
 			if (status == null) {

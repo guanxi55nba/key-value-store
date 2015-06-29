@@ -41,11 +41,9 @@ public class StatusSynMsg
         {
             for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : data.entrySet())
             {
-                ConcurrentSkipListMap<Long, Long> newMap = new ConcurrentSkipListMap<Long, Long>();
-                ConcurrentSkipListMap<Long, Long> result = m_data.putIfAbsent(entry.getKey(), newMap);
+                ConcurrentSkipListMap<Long, Long> result = m_data.putIfAbsent(entry.getKey(),new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
                 if (result != null)
-                    result = newMap;
-                result.putAll(entry.getValue());
+                    result.putAll(entry.getValue());
             }
         }
     }
@@ -186,11 +184,9 @@ public class StatusSynMsg
         ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> dataCopy = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long,Long>>();
         for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : m_data.entrySet())
         {
-            ConcurrentSkipListMap<Long, Long> newMap = new ConcurrentSkipListMap<Long, Long>();
-            ConcurrentSkipListMap<Long, Long> result = dataCopy.putIfAbsent(entry.getKey(), newMap);
+            ConcurrentSkipListMap<Long, Long> result = dataCopy.putIfAbsent(entry.getKey(),new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
             if (result != null)
-                result = newMap;
-            result.putAll(entry.getValue());
+                result.putAll(entry.getValue());
         }
         return dataCopy;
     }

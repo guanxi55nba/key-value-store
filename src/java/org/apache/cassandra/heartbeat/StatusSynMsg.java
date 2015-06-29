@@ -41,9 +41,11 @@ public class StatusSynMsg
         {
             for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : data.entrySet())
             {
-                ConcurrentSkipListMap<Long, Long> result = m_data.putIfAbsent(entry.getKey(),new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
+                ConcurrentSkipListMap<Long, Long> newMap = new ConcurrentSkipListMap<Long, Long>();
+                ConcurrentSkipListMap<Long, Long> result = m_data.putIfAbsent(entry.getKey(), newMap);
                 if (result != null)
-                    result.putAll(entry.getValue());
+                    result = newMap;
+                result.putAll(entry.getValue());
             }
         }
     }
@@ -180,13 +182,15 @@ public class StatusSynMsg
         return new StatusSynMsg(ksName, srcName, m_data, timestamp);
     }
     
-    public ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> dataCopy(){
+    ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> dataCopy(){
         ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> dataCopy = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long,Long>>();
         for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : m_data.entrySet())
         {
-            ConcurrentSkipListMap<Long, Long> result = dataCopy.putIfAbsent(entry.getKey(),new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
+            ConcurrentSkipListMap<Long, Long> newMap = new ConcurrentSkipListMap<Long, Long>();
+            ConcurrentSkipListMap<Long, Long> result = dataCopy.putIfAbsent(entry.getKey(), newMap);
             if (result != null)
-                result.putAll(entry.getValue());
+                result = newMap;
+            result.putAll(entry.getValue());
         }
         return dataCopy;
     }
@@ -270,7 +274,7 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
         size += TypeSizes.NATIVE.sizeof(dataSize);
         if (dataSize > 0)
         {
-            for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : statusMsgSyn.getDataImpl().entrySet())
+            for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : statusMsgSyn.getData().entrySet())
             {
                 size += TypeSizes.NATIVE.sizeof(entry.getKey());
                 int valueSize = entry.getValue().size();

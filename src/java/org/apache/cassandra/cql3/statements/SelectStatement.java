@@ -208,33 +208,44 @@ public class SelectStatement implements CQLStatement
         if (parameters.isCount && pageSize <= 0)
             pageSize = DEFAULT_COUNT_PAGE_SIZE;
         
-    	if (ConfReader.instance.heartbeatEnable()) {
-			Set<String> ksNames = HBUtils.getReadCommandRelatedKeySpaceNames(command);
-			boolean superset = true;
-			for (String ks : ksNames) {
-				if (!HBUtils.SYSTEM_KEYSPACES.contains(ks)) {
-					superset = false;
-					break;
-				}
-			}
-			if (!superset) {
-				if (StatusMap.instance.hasLatestValue(command, now)) {
-					logger.info("execute: hasLatestValue -> {}", "true");
-				} else {
-					logger.info("execute: hasLatestValue -> {}", "false");
-					// sink subscription
-					synchronized (lock) {
-						try {
-							ReadHandler.instance.sinkReadHandler(command, now, lock);
-							lock.wait();
-							logger.info("[WaitingThread]: Successfully notified!");
-						} catch (Exception e) {
-							logger.error("Exception: {}", e.getMessage());
-						}
-					}
-				}
-			}
-		}
+        if (ConfReader.instance.heartbeatEnable())
+        {
+            Set<String> ksNames = HBUtils.getReadCommandRelatedKeySpaceNames(command);
+            boolean superset = true;
+            for (String ks : ksNames)
+            {
+                if (!HBUtils.SYSTEM_KEYSPACES.contains(ks))
+                {
+                    superset = false;
+                    break;
+                }
+            }
+            if (!superset)
+            {
+                if (StatusMap.instance.hasLatestValue(command, now))
+                {
+                    logger.info("execute: hasLatestValue -> {}", "true");
+                }
+                else
+                {
+                    logger.info("execute: hasLatestValue -> {}", "false");
+                    // sink subscription
+                    synchronized (lock)
+                    {
+                        try
+                        {
+                            ReadHandler.instance.sinkReadHandler(command, now, lock);
+                            lock.wait();
+                            logger.info("[WaitingThread]: Successfully notified!");
+                        }
+                        catch (Exception e)
+                        {
+                            logger.error("Exception: {}", e.getMessage());
+                        }
+                    }
+                }
+            }
+        }
 
         if (pageSize <= 0 || command == null || !QueryPagers.mayNeedPaging(command, pageSize))
         {

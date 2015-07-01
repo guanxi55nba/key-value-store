@@ -1,9 +1,6 @@
 package org.apache.cassandra.heartbeat.readhandler;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map.Entry;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -14,13 +11,14 @@ import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.RangeSliceCommand;
 import org.apache.cassandra.db.ReadCommand;
 import org.apache.cassandra.heartbeat.StatusSynMsg;
-import org.apache.cassandra.heartbeat.extra.HBConsts;
 import org.apache.cassandra.heartbeat.status.StatusMap;
 import org.apache.cassandra.heartbeat.utils.ConfReader;
 import org.apache.cassandra.heartbeat.utils.HBUtils;
 import org.apache.cassandra.service.pager.Pageable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.collect.Lists;
 
 /**
  * 
@@ -32,13 +30,13 @@ import org.slf4j.LoggerFactory;
 public class ReadHandler
 {
     private static final Logger logger = LoggerFactory.getLogger(ReadHandler.class);
-    ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, ConcurrentSkipListSet<Subscription>>>> m_subscriptionMatrics;
+    ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListSet<Subscription>>> m_subscriptionMatrics;
 
     public static final ReadHandler instance = new ReadHandler();
 
     private ReadHandler()
     {
-        m_subscriptionMatrics = new ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, ConcurrentSkipListSet<Subscription>>>>();
+        m_subscriptionMatrics = new ConcurrentHashMap<String, ConcurrentHashMap<String,ConcurrentSkipListSet<Subscription>>>();
     }
 
     /**
@@ -55,7 +53,7 @@ public class ReadHandler
             for (ColumnFamily col : inMutation.getColumnFamilies())
             {
                 String key = HBUtils.getPrimaryKeyName(col.metadata());
-                Cell cell = col.getColumn(HBUtils.cellname(HBConsts.VERSON_NO));
+                Cell cell = col.getColumn(HBUtils.VERSION_CELLNAME);
                 final long timestamp = cell.timestamp();
                 notifySubscription(ksName, key, timestamp);
             }
@@ -77,37 +75,21 @@ public class ReadHandler
         }
     }
 
-    public void notifySubscription(String ksName, String key, final long timestamp)
+    public void notifySubscription(String ksName, String key, final long msgTs)
     {
-        ConcurrentSkipListMap<Long, ConcurrentSkipListSet<Subscription>> vnToSubs = getSubscriptions(ksName, key);
-        if (vnToSubs != null)
+        ConcurrentSkipListSet<Subscription> vnToSubs = getSubscriptions(ksName, key);
+        for (Subscription sub : vnToSubs)
         {
-            for (Entry<Long, ConcurrentSkipListSet<Subscription>> entry : vnToSubs.entrySet())
+            if (sub.getTimestamp() <= msgTs)
             {
-                Long ts = entry.getKey();
-                if (ts <= timestamp)
+                // if (ConfReader.instance.isLogEnabled())
+                // logger.info("ReadHandler.notifySubscription: ts<=timestamp");
+                if (StatusMap.instance.hasLatestValue(sub.getPageable(), sub.getTimestamp()))
                 {
-                    // if (ConfReader.instance.isLogEnabled())
-                    // logger.info("ReadHandler.notifySubscription: ts<=timestamp");
-                    ConcurrentSkipListSet<Subscription> subs = entry.getValue();
-                    Set<Subscription> removed = new HashSet<Subscription>();
-                    if (subs != null)
+                    vnToSubs.remove(sub);
+                    synchronized (sub.getLockObject())
                     {
-                        for (Subscription sub : subs)
-                        {
-                            // Check whether subscription has latest value
-                            if (StatusMap.instance.hasLatestValue(sub.getPageable(), sub.getTimestamp()))
-                            {
-                                synchronized (sub.getLockObject())
-                                {
-                                    sub.getLockObject().notify();
-                                }
-                                removed.add(sub);
-                            }
-                        }
-                        subs.removeAll(removed);
-                        if (subs.isEmpty())
-                            vnToSubs.remove(ts);
+                        sub.getLockObject().notify();
                     }
                 }
             }
@@ -119,24 +101,20 @@ public class ReadHandler
         if (page != null)
         {
             Subscription subscription = new Subscription(page, inTimestamp, inBytes);
-            if (page instanceof RangeSliceCommand)
+            boolean isReadCommands = page instanceof Pageable.ReadCommands;
+            boolean isReadcommand = !isReadCommands && page instanceof ReadCommand;
+            if (isReadCommands || isReadcommand)
             {
-                logger.info("ReadHandler::sinkReadHandler, page is instance of RangeSliceCommand");
-            }
-            else if (page instanceof Pageable.ReadCommands)
-            {
-                List<ReadCommand> readCommands = ((Pageable.ReadCommands) page).commands;
+                List<ReadCommand> readCommands = (isReadcommand) ? Lists.newArrayList((ReadCommand) page): ((Pageable.ReadCommands) page).commands;
                 for (ReadCommand cmd : readCommands)
                 {
                     String key = HBUtils.byteBufferToString(cmd.ksName, cmd.cfName, cmd.key);
                     updateSubscriptions(cmd.ksName, key, inTimestamp, subscription);
                 }
             }
-            else if (page instanceof ReadCommand)
+            else if (page instanceof RangeSliceCommand)
             {
-                ReadCommand cmd = (ReadCommand) page;
-                String key = HBUtils.byteBufferToString(cmd.ksName, cmd.cfName, cmd.key);
-                updateSubscriptions(cmd.ksName, key, inTimestamp, subscription);
+                logger.info("ReadHandler::sinkReadHandler, page is instance of RangeSliceCommand");
             }
             else
             {
@@ -150,50 +128,32 @@ public class ReadHandler
         }
     }
 
-    private ConcurrentSkipListMap<Long, ConcurrentSkipListSet<Subscription>> getSubscriptions(String inKsName,
+    private ConcurrentSkipListSet<Subscription> getSubscriptions(String inKsName,
             String inKey)
     {
-        ConcurrentSkipListMap<Long, ConcurrentSkipListSet<Subscription>> subscriptions = null;
-        ConcurrentHashMap<String, ConcurrentSkipListMap<Long, ConcurrentSkipListSet<Subscription>>> keyToVersionSubs = m_subscriptionMatrics
-                .get(inKsName);
-        if (keyToVersionSubs != null)
-        {
-            subscriptions = keyToVersionSubs.get(inKey);
-        }
-        return subscriptions;
+        ConcurrentHashMap<String, ConcurrentSkipListSet<Subscription>> newKeyToVersionSubs = new ConcurrentHashMap<String, ConcurrentSkipListSet<Subscription>>();
+        ConcurrentHashMap<String, ConcurrentSkipListSet<Subscription>> keyToVersionSubs = m_subscriptionMatrics.put(inKsName, newKeyToVersionSubs);
+        if (keyToVersionSubs == null)
+            keyToVersionSubs = newKeyToVersionSubs;
+
+        ConcurrentSkipListSet<Subscription> newSubs = new ConcurrentSkipListSet<Subscription>();
+        ConcurrentSkipListSet<Subscription> subs = keyToVersionSubs.putIfAbsent(inKey, newSubs);
+        if (subs == null)
+            subs = newSubs;
+        return subs;
     }
 
     private void updateSubscriptions(String inKsName, String inKey, long inTs, Subscription inSub)
     {
-        ConcurrentHashMap<String, ConcurrentSkipListMap<Long, ConcurrentSkipListSet<Subscription>>> keyToVersionSubs = m_subscriptionMatrics
-                .get(inKsName);
+        ConcurrentHashMap<String, ConcurrentSkipListSet<Subscription>> newKeyToVersionSubs = new ConcurrentHashMap<String, ConcurrentSkipListSet<Subscription>>();
+        ConcurrentHashMap<String, ConcurrentSkipListSet<Subscription>> keyToVersionSubs = m_subscriptionMatrics.put(inKsName, newKeyToVersionSubs);
         if (keyToVersionSubs == null)
-        {
-            ConcurrentHashMap<String, ConcurrentSkipListMap<Long, ConcurrentSkipListSet<Subscription>>> newKeyToVersionSubs =
-                    new ConcurrentHashMap<String, ConcurrentSkipListMap<Long, ConcurrentSkipListSet<Subscription>>>();
-            keyToVersionSubs = m_subscriptionMatrics.putIfAbsent(inKsName, newKeyToVersionSubs);
-            if (keyToVersionSubs == null)
-                keyToVersionSubs = newKeyToVersionSubs;
-        }
+            keyToVersionSubs = newKeyToVersionSubs;
 
-        ConcurrentSkipListMap<Long, ConcurrentSkipListSet<Subscription>> vnToSubs = keyToVersionSubs.get(inKey);
-        if (vnToSubs == null)
-        {
-            vnToSubs = new ConcurrentSkipListMap<Long, ConcurrentSkipListSet<Subscription>>();
-            ConcurrentSkipListMap<Long, ConcurrentSkipListSet<Subscription>> resultB = keyToVersionSubs.putIfAbsent(
-                    inKey, vnToSubs);
-            if (resultB != null)
-                vnToSubs = resultB;
-        }
-
-        ConcurrentSkipListSet<Subscription> subs = vnToSubs.get(inTs);
+        ConcurrentSkipListSet<Subscription> newSubs = new ConcurrentSkipListSet<Subscription>();
+        ConcurrentSkipListSet<Subscription> subs = keyToVersionSubs.putIfAbsent(inKey, newSubs);
         if (subs == null)
-        {
-            subs = new ConcurrentSkipListSet<Subscription>();
-            ConcurrentSkipListSet<Subscription> resultC = vnToSubs.putIfAbsent(inTs, subs);
-            if (resultC != null)
-                subs = resultC;
-        }
+            subs = newSubs;
 
         subs.add(inSub);
     }

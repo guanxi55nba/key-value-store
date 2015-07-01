@@ -233,7 +233,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
 		for (InetAddress inetAddress : replicaList) {
 			StatusSynMsg statusMsgSyn = m_statusMsgMap.get(inetAddress);
 			if (statusMsgSyn == null) {
-				StatusSynMsg newMsg = new StatusSynMsg(inKSName,localSrcName, null, System.currentTimeMillis());
+                StatusSynMsg newMsg = new StatusSynMsg(inKSName, localSrcName, System.currentTimeMillis());
 				statusMsgSyn = m_statusMsgMap.putIfAbsent(inetAddress, newMsg);
 				if(statusMsgSyn==null)
 				    statusMsgSyn = newMsg;

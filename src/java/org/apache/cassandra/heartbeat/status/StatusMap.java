@@ -4,6 +4,7 @@ import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
@@ -20,6 +21,8 @@ import org.apache.cassandra.service.pager.Pageable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.Lists;
+
 /**
  * Stand alone component to keep status msg related info map
  * 
@@ -28,17 +31,15 @@ import org.slf4j.LoggerFactory;
  */
 public class StatusMap
 {
-
     private static final Logger logger = LoggerFactory.getLogger(StatusMap.class);
-
+    private static final long DEFAULT_LATEST_VN = -2;
     ConcurrentHashMap<String, ConcurrentHashMap<String, Status>> m_currentEntries; // key,src,statusmap
-    ConcurrentHashMap<String, ConcurrentHashMap<String, Status>> m_removedEntries; // key,src,statusmap
     public static final StatusMap instance = new StatusMap();
+    
 
     private StatusMap()
     {
         m_currentEntries = new ConcurrentHashMap<String, ConcurrentHashMap<String, Status>>();
-        m_removedEntries = new ConcurrentHashMap<String, ConcurrentHashMap<String, Status>>();
     }
 
     /**
@@ -55,32 +56,14 @@ public class StatusMap
             long timestamp = inSynMsg.getTimestamp();
             for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : statusData.entrySet())
             {
+                // Get key value
                 String key = entry.getKey();
                 ConcurrentSkipListMap<Long, Long> valueMap = entry.getValue();
-                ConcurrentSkipListMap<Long, Long> vn_ts = new ConcurrentSkipListMap<Long, Long>();
-
-                // Filter the status in the removed entries
-                Status removedStatus = getStatusFromEntryMap(m_removedEntries, key, inSrcName);
-                ConcurrentSkipListMap<Long, Long> removedVnToTs = removedStatus.getVnToTsMap();
-                synchronized (removedVnToTs)
-                {
-                    if (removedVnToTs.isEmpty())
-                    {
-                        vn_ts.putAll(valueMap);
-                    }
-                    else
-                    {
-                        for (Map.Entry<Long, Long> item : valueMap.entrySet())
-                        {
-                            if (!removedVnToTs.containsKey(item.getKey()))
-                                vn_ts.put(item.getKey(), item.getValue());
-                        }
-                    }
-                    
-                    // Update current status
-                    updateEntryMapStatus(m_currentEntries, key, inSrcName, vn_ts, timestamp);
-                }
-
+                
+                // Get status object and update data 
+                Status status = getStatusFromEntryMap(m_currentEntries, key, inSrcName);
+                status.addVnTsData(valueMap, timestamp);
+                
                 // Notify sinked read handler
                 ReadHandler.instance.notifySubscription(inSynMsg.getKsName(), key, timestamp);
             }
@@ -97,23 +80,16 @@ public class StatusMap
         if (inSrcName != null && inMutation != null)
         {
             String ksName = inMutation.getKeyspaceName();
-            long currentTs = System.currentTimeMillis();
             if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName))
             {
-                for (ColumnFamily col : inMutation.getColumnFamilies())
+                for (ColumnFamily cf : inMutation.getColumnFamilies())
                 {
-                    Version version = HBUtils.getMutationVersion(col);
+                    Version version = HBUtils.getMutationVersion(cf);
                     if (version != null)
                     {
-                        String key = HBUtils.getPrimaryKeyName(col.metadata());
-                        Status removedStatus = getStatusFromEntryMap(m_removedEntries, key, inSrcName);
-                        ConcurrentSkipListMap<Long, Long> removedVnToTs = removedStatus.getVnToTsMap();
-                        synchronized (removedVnToTs)
-                        {
-                            Status currentStatus = getStatusFromEntryMap(m_currentEntries, key, inSrcName);
-                            currentStatus.removeEntry(version.getLocalVersion());
-                            removedVnToTs.put(version.getLocalVersion(), currentTs);
-                        }
+                        String key = HBUtils.getPrimaryKeyName(cf.metadata());
+                        Status status = getStatusFromEntryMap(m_currentEntries, key, inSrcName);
+                        status.removeEntry(version.getTimestamp(), version.getTimestamp());
                     }
                     else if (ConfReader.instance.isLogEnabled())
                     {
@@ -129,16 +105,19 @@ public class StatusMap
     }
 
     /**
-     * @param inPageable
+     * @param pageable
      * @param inTimestamp
      * @return
      */
-    public boolean hasLatestValue(Pageable inPageable, long inTimestamp)
+    public boolean hasLatestValue(Pageable pageable, long inTimestamp)
     {
         boolean hasLatestValue = true;
-        if (inPageable instanceof Pageable.ReadCommands)
+        boolean isReadCommands = pageable instanceof Pageable.ReadCommands;
+        boolean isReadcommand = !isReadCommands && pageable instanceof ReadCommand;
+        if (isReadCommands || isReadcommand)
         {
-            List<ReadCommand> readCommands = ((Pageable.ReadCommands) inPageable).commands;
+            List<ReadCommand> readCommands = (isReadcommand) ? Lists.newArrayList((ReadCommand) pageable)
+                    : ((Pageable.ReadCommands) pageable).commands;
             for (ReadCommand cmd : readCommands)
             {
                 String key = HBUtils.byteBufferToString(cmd.ksName, cmd.cfName, cmd.key);
@@ -149,18 +128,9 @@ public class StatusMap
                 }
             }
         }
-        else if (inPageable instanceof RangeSliceCommand)
+        else if (pageable instanceof RangeSliceCommand)
         {
             logger.error("StatusMap::hasLatestValue, RangeSliceCommand doesn't support");
-        }
-        else if (inPageable instanceof ReadCommand)
-        {
-            ReadCommand cmd = (ReadCommand) inPageable;
-            String key = HBUtils.byteBufferToString(cmd.ksName, cmd.cfName, cmd.key);
-            if (!hasLatestValueImpl(cmd.ksName, key, cmd.key, inTimestamp))
-            {
-                hasLatestValue = false;
-            }
         }
         else
         {
@@ -177,46 +147,36 @@ public class StatusMap
         for (InetAddress sourceName : replicaList)
         {
             Status status = getStatusFromEntryMap(m_currentEntries, inKeyStr, sourceName.getHostAddress());
-            if (status == null)
+            long updateTs = status.getUpdateTs();
+            if (updateTs <= inTimestamp)
             {
                 hasLatestValue = false;
-                logger.info("StatusMap::hasLatestValueImpl, hasLatestValue == false, status == null");
+                logger.info("StatusMap::hasLatestValueImpl, {}, hasLatestValue == false, update ts [{}] <= inTimestamp [{}]", hasLatestValue,
+                        HBUtils.dateFormat(updateTs), HBUtils.dateFormat(inTimestamp));
             }
             else
             {
-                if (status.getUpdateTs() <= inTimestamp)
+                long latestVersion = DEFAULT_LATEST_VN;
+                TreeMap<Long, Long> versions = status.getVnToTsMap(); // vn: ts
+                // if doesn't exist entry whose timestamp < inTimestamp, then this node contains the latest data
+                for (Map.Entry<Long, Long> entry : versions.entrySet())
                 {
-                    hasLatestValue = false;
-                    logger.info("StatusMap::hasLatestValueImpl, {}, update ts {} <= inTimestamp {}", hasLatestValue,
-                            HBUtils.dateFormat(status.getUpdateTs()), HBUtils.dateFormat(inTimestamp));
-                }
-                else
-                {
-                    // vn: ts
-                    ConcurrentSkipListMap<Long, Long> versions = status.getVnToTsMap();
-                    // if doesn't exist entry whose timestamp < inTimestamp,then row is the latest in this datacenter
-                    long latestVersion = -2;
-                    for (Map.Entry<Long, Long> entry : versions.entrySet())
+                    long vn = entry.getKey();
+                    if (vn >= 0)
                     {
-                        long vn = entry.getKey();
-                        if (vn >= 0)
+                        long ts = entry.getValue();
+                        if (ts <= inTimestamp)
                         {
-                            long ts = entry.getValue();
-                            if (ts <= inTimestamp)
-                            {
-                                hasLatestValue = false;
-                                if (vn > latestVersion)
-                                    latestVersion = vn;
-                            }
+                            hasLatestValue = false;
+                            if (vn > latestVersion)
+                                latestVersion = vn;
                         }
                     }
-                    if (latestVersion != -2)
-                    {
-                        // Wait for mutation
-                        hasLatestValue = false;
-                        logger.info("StatusMap::hasLatestValueImpl, hasLatestValue == false, latestVersion == ",
-                                latestVersion);
-                    }
+                }
+                if (latestVersion != DEFAULT_LATEST_VN) // Wait for mutation
+                {
+                    hasLatestValue = false;
+                    logger.info("StatusMap::hasLatestValueImpl, hasLatestValue == false, latestVersion == ", latestVersion);
                 }
             }
         }
@@ -239,26 +199,42 @@ public class StatusMap
         return status;
     }
 
-    private void updateEntryMapStatus(ConcurrentHashMap<String, ConcurrentHashMap<String, Status>> inEntries,
-            String inKey, String inSrc, ConcurrentSkipListMap<Long, Long> inVnToTs, long inTs)
-    {
-        ConcurrentHashMap<String, Status> newSrcStatusMap = new ConcurrentHashMap<String, Status>();
-        ConcurrentHashMap<String, Status> srcToStatus = inEntries.putIfAbsent(inKey, newSrcStatusMap);
-        if (srcToStatus == null)
-            srcToStatus = newSrcStatusMap;
-
-        Status newStatus = new Status(inTs, inVnToTs);
-        Status status = srcToStatus.putIfAbsent(inSrc, newStatus);
-        if (status == null)
-            status = newStatus;
-
-        synchronized (status)
-        {
-            status.updateVnTsData(inVnToTs);
-            status.setUpdateTs(inTs);
-        }
-
-    }
+//    private void updateEntryMapStatus(ConcurrentHashMap<String, ConcurrentHashMap<String, Status>> inEntries,
+//            String inKey, String inSrc, Long inVn, Long inTs, long inMsgTs)
+//    {
+//        ConcurrentHashMap<String, Status> newSrcStatusMap = new ConcurrentHashMap<String, Status>();
+//        ConcurrentHashMap<String, Status> srcToStatus = inEntries.putIfAbsent(inKey, newSrcStatusMap);
+//        if (srcToStatus == null)
+//            srcToStatus = newSrcStatusMap;
+//
+//        Status newStatus = new Status();
+//        Status status = srcToStatus.putIfAbsent(inSrc, newStatus);
+//        if (status == null)
+//            status = newStatus;
+//        status.updateVnTsData(inVn, inTs);
+//        ;
+//        status.setUpdateTs(inMsgTs);
+//    }
+    
+//    protected void updateEntryMapStatus(ConcurrentHashMap<String, ConcurrentHashMap<String, Status>> inEntries,
+//            String inKey, String inSrc, ConcurrentSkipListMap<Long, Long> inVnToTs, long inTs)
+//    {
+//        ConcurrentHashMap<String, Status> newSrcStatusMap = new ConcurrentHashMap<String, Status>();
+//        ConcurrentHashMap<String, Status> srcToStatus = inEntries.putIfAbsent(inKey, newSrcStatusMap);
+//        if (srcToStatus == null)
+//            srcToStatus = newSrcStatusMap;
+//
+//        Status newStatus = new Status(inTs, inVnToTs);
+//        Status status = srcToStatus.putIfAbsent(inSrc, newStatus);
+//        if (status == null)
+//            status = newStatus;
+//
+//        synchronized (status)
+//        {
+//            status.updateVnTsData(inVnToTs);
+//            status.setUpdateTs(inTs);
+//        }
+//    }
 
     // @Deprecated
     // private boolean hasLatestValueImpl(String inKSName, String inKey, long inTimestamp) {

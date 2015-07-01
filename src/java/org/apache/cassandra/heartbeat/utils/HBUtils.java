@@ -13,7 +13,6 @@ import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.ColumnDefinition;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.config.Schema;
-import org.apache.cassandra.cql3.ColumnIdentifier;
 import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.cql3.UntypedResultSet;
 import org.apache.cassandra.cql3.UntypedResultSet.Row;
@@ -27,7 +26,6 @@ import org.apache.cassandra.db.ReadCommand;
 import org.apache.cassandra.db.composites.CellName;
 import org.apache.cassandra.db.composites.CellNames;
 import org.apache.cassandra.db.composites.Composite;
-import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.exceptions.RequestExecutionException;
 import org.apache.cassandra.heartbeat.KeyMetaData;
@@ -48,6 +46,8 @@ import org.slf4j.LoggerFactory;
 public class HBUtils {
 	private static final String DATE_FORMAT = "yyyy-MM-dd HH:mm:ss SSS"; 
 	private static final Logger logger = LoggerFactory.getLogger(HBUtils.class);
+	public static CellName VERSION_CELLNAME = HBUtils.cellname(HBConsts.VERSON_NO);
+	public static CellName SOURCE_CELLNAME = HBUtils.cellname(HBConsts.SOURCE);
 	
 
 	public static final List<String> SYSTEM_KEYSPACES = new ArrayList<String>(Arrays.asList("system", "system_traces"));;
@@ -158,7 +158,7 @@ public class HBUtils {
 
 	public static Version getMutationVersion(final ColumnFamily columnFamily) {
 		Version version = null;
-		Cell cell = columnFamily.getColumn(HBUtils.cellname(HBConsts.VERSON_NO));
+		Cell cell = columnFamily.getColumn(VERSION_CELLNAME);
 		if (cell != null) {
 			try {
 				long timestamp = cell.timestamp();
@@ -170,10 +170,23 @@ public class HBUtils {
 		}
 		return version;
 	}
+	
+	public static Long getMutationVersionAsLong(final ColumnFamily columnFamily) {
+	    Long version = null;
+	    Cell cell = columnFamily.getColumn(VERSION_CELLNAME);
+	    if (cell != null) {
+	        try {
+	            version = cell.value().asReadOnlyBuffer().getLong();
+	        } catch (Exception e) {
+	            logger.error("getMutationVersion exception {} ", e);
+	        }
+	    }
+	    return version;
+	}
 
 	public static String getMutationSource(final ColumnFamily columnFamily) {
 		String source = "";
-		Cell cell = columnFamily.getColumn(HBUtils.cellname(HBConsts.SOURCE));
+		Cell cell = columnFamily.getColumn(SOURCE_CELLNAME);
 		if (cell != null) {
 			try {
 				source = ByteBufferUtil.string(cell.value());

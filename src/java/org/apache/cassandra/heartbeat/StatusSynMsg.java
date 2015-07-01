@@ -31,6 +31,13 @@ public class StatusSynMsg
     long timestamp;
     private volatile ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> m_data = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>();
     //Random randomGenerator = new Random();
+    
+    public StatusSynMsg(String ksName, String srcName, long timestamp)
+    {
+        this.ksName = ksName;
+        this.srcName = srcName;
+        this.timestamp = timestamp;
+    }
 
     public StatusSynMsg(String ksName, String srcName, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> data, long timestamp)
     {
@@ -200,12 +207,12 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
         out.writeUTF(msg.ksName);
         out.writeUTF(msg.srcName);
         out.writeLong(msg.getTimestamp());
-        ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> dataCopy = msg.dataCopy();
-        int dataSize = dataCopy.size();
+        ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> data = msg.getData();
+        int dataSize = data.size();
         out.writeInt(dataSize);
         if (dataSize > 0)
         {
-            for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : dataCopy.entrySet())
+            for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : data.entrySet())
             {
                 out.writeUTF(entry.getKey());
                 int valueSize = entry.getValue().size();

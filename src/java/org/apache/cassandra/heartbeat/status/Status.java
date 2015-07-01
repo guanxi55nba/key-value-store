@@ -1,6 +1,7 @@
 package org.apache.cassandra.heartbeat.status;
 
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
@@ -9,26 +10,56 @@ import java.util.concurrent.ConcurrentSkipListMap;
  * @author XiGuan
  * 
  */
-public class Status {
+public class Status
+{
+    private volatile long m_updateTs;
+    private ConcurrentSkipListMap<Long, Long> m_currentVnToTs;
+    private ConcurrentSkipListMap<Long, Long> m_removedVnToTs = new ConcurrentSkipListMap<Long, Long>();
+    byte[] m_lockObj = new byte[0];
 
-	private long m_updateTs;
-	private ConcurrentSkipListMap<Long, Long> m_vnToTs;
-	
-	public Status() {
-	    m_updateTs = -1;
-	    m_vnToTs = new ConcurrentSkipListMap<Long, Long>();
-	}
+    public Status()
+    {
+        m_updateTs = -1;
+        m_currentVnToTs = new ConcurrentSkipListMap<Long, Long>();
+    }
 
-	public Status(long inUpdateTs, ConcurrentSkipListMap<Long, Long> inVnToTs) {
-		m_updateTs = inUpdateTs;
-		m_vnToTs = inVnToTs;
-        if (m_vnToTs == null)
-            m_vnToTs = new ConcurrentSkipListMap<Long, Long>();
-	}
-	
-	public void updateVnTsData(long inVersionNo, long inTimestamp) {
-		m_vnToTs.put(inVersionNo, inTimestamp);
-	}
+    public void addVnTsData(long inVersionNo, long inTimestamp)
+    {
+        synchronized (m_lockObj)
+        {
+            if (!m_removedVnToTs.containsKey(inVersionNo))
+            {
+                m_currentVnToTs.put(inVersionNo, inTimestamp);
+            }
+        }
+    }
+    
+    public void addVnTsData(Map<Long, Long> inMap, long inTs)
+    {
+        synchronized (m_lockObj)
+        {
+            for (Map.Entry<Long, Long> entry : inMap.entrySet())
+            {
+                if (!m_removedVnToTs.containsKey(entry.getKey()))
+                {
+                    m_currentVnToTs.put(entry.getKey(), entry.getValue());
+                }
+            }
+            setUpdateTs(inTs);
+        }
+    }
+    
+    public Long removeEntry(Long inVersion, Long inTs)
+    {
+        boolean removed;
+        synchronized (m_lockObj)
+        {
+            m_removedVnToTs.put(inVersion, inTs);
+            removed = m_currentVnToTs.remove(inVersion, inTs);
+        }
+        long ts = removed ? inTs : System.currentTimeMillis();
+        return ts;
+    }
 
     public void setUpdateTs(long inUpdateTs)
     {
@@ -36,20 +67,13 @@ public class Status {
             m_updateTs = inUpdateTs;
     }
 
-	public long getUpdateTs() {
-		return m_updateTs;
-	}
-
-    public void updateVnTsData(Map<Long, Long> inMap)
+    public long getUpdateTs()
     {
-        m_vnToTs.putAll(inMap);
+        return m_updateTs;
     }
 
-	public Long removeEntry(Long inVersion) {
-		return m_vnToTs.remove(inVersion);
-	}
-
-	public ConcurrentSkipListMap<Long, Long> getVnToTsMap() {
-		return m_vnToTs;
-	}
+    public TreeMap<Long, Long> getVnToTsMap()
+    {
+        return new TreeMap<Long, Long>(m_currentVnToTs);
+    }
 }

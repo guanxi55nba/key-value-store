@@ -33,7 +33,7 @@ public class StatusMap
 {
     private static final Logger logger = LoggerFactory.getLogger(StatusMap.class);
     private static final long DEFAULT_LATEST_VN = -2;
-    ConcurrentHashMap<String, ConcurrentHashMap<String, Status>> m_currentEntries; // key,src,statusmap
+    ConcurrentHashMap<String, ConcurrentHashMap<String, Status>> m_currentEntries; // src, key,statusmap
     public static final StatusMap instance = new StatusMap();
     
 
@@ -48,24 +48,38 @@ public class StatusMap
      * @param inSrcName
      * @param inSynMsg
      */
-    public void updateStatusMap(String inSrcName, final StatusSynMsg inSynMsg)
+    public void updateStatusMap(final String inSrcName, final StatusSynMsg inSynMsg)
     {
         if (inSynMsg != null)
         {
-            ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> statusData = inSynMsg.getData();
+            ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> synMsgData = inSynMsg.getData();
             long timestamp = inSynMsg.getTimestamp();
-            for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : statusData.entrySet())
+            
+            ConcurrentHashMap<String, Status> keyToStatusMap = getKeyToStatusMap(m_currentEntries, inSrcName);
+            for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : synMsgData.entrySet())
             {
                 // Get key value
                 String key = entry.getKey();
                 ConcurrentSkipListMap<Long, Long> valueMap = entry.getValue();
                 
                 // Get status object and update data 
-                Status status = getStatusFromEntryMap(m_currentEntries, key, inSrcName);
+                Status status = getStatusFromKeyToStautsMap(keyToStatusMap, key);
                 status.addVnTsData(valueMap, timestamp);
                 
                 // Notify sinked read handler
                 ReadHandler.instance.notifySubscription(inSynMsg.getKsName(), key, timestamp);
+            }
+            
+            for (Map.Entry<String, Status> entry : keyToStatusMap.entrySet())
+            {
+                String key = entry.getKey();
+                if (!synMsgData.contains(key))
+                {
+                    entry.getValue().setUpdateTs(timestamp);
+                    
+                    // Notify sinked read handler
+                    ReadHandler.instance.notifySubscription(inSynMsg.getKsName(), key, timestamp);
+                }
             }
         }
         else
@@ -182,17 +196,35 @@ public class StatusMap
         }
         return hasLatestValue;
     }
+    
+    private ConcurrentHashMap<String, Status> getKeyToStatusMap(ConcurrentHashMap<String, ConcurrentHashMap<String, Status>> inEntries, String inSrc)
+    {
+        ConcurrentHashMap<String, Status> newKeyToStatus = new ConcurrentHashMap<String, Status>();
+        ConcurrentHashMap<String, Status> keyToStatus = inEntries.putIfAbsent(inSrc, newKeyToStatus);
+        if (keyToStatus == null)
+            keyToStatus = newKeyToStatus;
+        return keyToStatus;
+    }
+    
+    private Status getStatusFromKeyToStautsMap(ConcurrentHashMap<String, Status> keyToStatus, String inKey)
+    {
+        Status newStatus = new Status();
+        Status status = keyToStatus.putIfAbsent(inKey, newStatus);
+        if (status == null)
+            status = newStatus;
+        return status;
+    }
 
     private Status getStatusFromEntryMap(ConcurrentHashMap<String, ConcurrentHashMap<String, Status>> inEntries,
             String inKey, String inSrc)
     {
-        ConcurrentHashMap<String, Status> newSrcStatusMap = new ConcurrentHashMap<String, Status>();
-        ConcurrentHashMap<String, Status> srcToStatus = inEntries.putIfAbsent(inKey, newSrcStatusMap);
-        if (srcToStatus == null)
-            srcToStatus = newSrcStatusMap;
+        ConcurrentHashMap<String, Status> newKeyToStatus = new ConcurrentHashMap<String, Status>();
+        ConcurrentHashMap<String, Status> keyToStatus = inEntries.putIfAbsent(inSrc, newKeyToStatus);
+        if (keyToStatus == null)
+            keyToStatus = newKeyToStatus;
         
         Status newStatus = new Status();
-        Status status = srcToStatus.putIfAbsent(inSrc, newStatus);
+        Status status = keyToStatus.putIfAbsent(inKey, newStatus);
         if (status == null)
             status = newStatus;
 

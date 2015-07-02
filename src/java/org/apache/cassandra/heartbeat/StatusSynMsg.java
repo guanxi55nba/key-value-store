@@ -27,46 +27,35 @@ public class StatusSynMsg
     protected static final Logger logger = LoggerFactory.getLogger(StatusSynMsg.class);
     public static final IVersionedSerializer<StatusSynMsg> serializer = new StatusMsgSerializationHelper();
     final String ksName;
-    final String srcName;
     long timestamp;
     private volatile ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> m_data = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>();
-    //Random randomGenerator = new Random();
     
-    public StatusSynMsg(String ksName, String srcName, long timestamp)
+    public StatusSynMsg(String ksName, long timestamp)
     {
         this.ksName = ksName;
-        this.srcName = srcName;
         this.timestamp = timestamp;
     }
 
-    public StatusSynMsg(String ksName, String srcName, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> data, long timestamp)
+    public StatusSynMsg(String ksName, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> data, long timestamp)
     {
         this.ksName = ksName;
-        this.srcName = srcName;
         this.timestamp = timestamp;
         if (data != null && !data.isEmpty())
         {
             for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : data.entrySet())
             {
-                ConcurrentSkipListMap<Long, Long> result = m_data.putIfAbsent(entry.getKey(),new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
-                if (result != null)
-                    result.putAll(entry.getValue());
+                m_data.put(entry.getKey(), new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
             }
         }
     }
 
     public void addKeyVersion(String key, Long version, Long timestamp)
     {
-//		key = "user" + randomGenerator.nextInt(10000);
-//		version = (long) randomGenerator.nextInt(10000);
-//		timestamp = System.currentTimeMillis();
         ConcurrentSkipListMap<Long, Long> vnTsMap = m_data.get(key);
         if (vnTsMap == null)
         {
             vnTsMap = new ConcurrentSkipListMap<Long, Long>();
-//            synchronized (m_data){
-                m_data.put(key, vnTsMap);
-//            }
+            m_data.put(key, vnTsMap);
         }
         vnTsMap.put(version, timestamp);
     }
@@ -91,18 +80,18 @@ public class StatusSynMsg
      */
     public ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> getData()
     {
-        // TreeMap<String, TreeMap<Long, Long>> data = new TreeMap<String, TreeMap<Long, Long>>();
-        // for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : m_data
-        // .entrySet()) {
-        // data.put(entry.getKey(), new TreeMap<Long, Long>(entry.getValue()));
-        // }
-        // return data;
         return m_data;
     }
-
-    public ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> getDataImpl()
-    {
-        return m_data;
+    
+    ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> dataCopy(){
+        ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> dataCopy = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long,Long>>();
+        for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : m_data.entrySet())
+        {
+            ConcurrentSkipListMap<Long, Long> result = dataCopy.putIfAbsent(entry.getKey(),new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
+            if (result != null)
+                result.putAll(entry.getValue());
+        }
+        return dataCopy;
     }
 
     public long getTimestamp()
@@ -115,11 +104,9 @@ public class StatusSynMsg
      */
     public void cleanData()
     {
-        for (ConcurrentSkipListMap<Long, Long> vnTsMap : m_data.values()){
-//            synchronized (m_data)
-//            {
-                vnTsMap.clear();
-//            }
+        for (ConcurrentSkipListMap<Long, Long> vnTsMap : m_data.values())
+        {
+            vnTsMap.clear();
         }
     }
 
@@ -127,9 +114,6 @@ public class StatusSynMsg
     {
         StringBuilder sb = new StringBuilder();
         sb.append("{ ");
-        sb.append("Src: ");
-        sb.append(srcName);
-        sb.append(", ");
         for (Entry<String, ConcurrentSkipListMap<Long, Long>> dataEntry : m_data.entrySet())
         {
             sb.append(dataEntry.getKey());
@@ -160,9 +144,6 @@ public class StatusSynMsg
     {
         StringBuilder sb = new StringBuilder();
         sb.append("{ ");
-        sb.append("Src: ");
-        sb.append(srcName);
-        sb.append(", ");
         sb.append("TS: ");
         sb.append(HBUtils.dateFormat(timestamp));
         sb.append(" }");
@@ -172,11 +153,6 @@ public class StatusSynMsg
         return sb.toString();
     }
 
-    public String getSrcName()
-    {
-        return srcName;
-    }
-
     public String getKsName()
     {
         return ksName;
@@ -184,18 +160,7 @@ public class StatusSynMsg
     
     public StatusSynMsg copy()
     {
-        return new StatusSynMsg(ksName, srcName, m_data, timestamp);
-    }
-    
-    ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> dataCopy(){
-        ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> dataCopy = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long,Long>>();
-        for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : m_data.entrySet())
-        {
-            ConcurrentSkipListMap<Long, Long> result = dataCopy.putIfAbsent(entry.getKey(),new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
-            if (result != null)
-                result.putAll(entry.getValue());
-        }
-        return dataCopy;
+        return new StatusSynMsg(ksName, m_data, timestamp);
     }
 }
 
@@ -205,7 +170,6 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
     public void serialize(StatusSynMsg msg, DataOutputPlus out, int version) throws IOException
     {
         out.writeUTF(msg.ksName);
-        out.writeUTF(msg.srcName);
         out.writeLong(msg.getTimestamp());
         ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> data = msg.dataCopy();
         int dataSize = data.size();
@@ -233,7 +197,6 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
     public StatusSynMsg deserialize(DataInput in, int version) throws IOException
     {
         String ksName = in.readUTF();
-        String srcName = in.readUTF();
         long timestamp = in.readLong();
         int dataSize = in.readInt();
         ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> data = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>();
@@ -252,7 +215,7 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
                 data.put(key, maps);
             }
         }
-        return new StatusSynMsg(ksName, srcName, data, timestamp);
+        return new StatusSynMsg(ksName,  data, timestamp);
     }
 
     public static byte[] readByteArray(DataInput in) throws IOException
@@ -271,7 +234,6 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
     public long serializedSize(StatusSynMsg statusMsgSyn, int version)
     {
         long size = TypeSizes.NATIVE.sizeof(statusMsgSyn.ksName);
-        size += TypeSizes.NATIVE.sizeof(statusMsgSyn.srcName);
         size += TypeSizes.NATIVE.sizeof(statusMsgSyn.getTimestamp());
         int dataSize = statusMsgSyn.getData().size();
         size += TypeSizes.NATIVE.sizeof(dataSize);

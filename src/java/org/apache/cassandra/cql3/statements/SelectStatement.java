@@ -211,24 +211,15 @@ public class SelectStatement implements CQLStatement
         if (ConfReader.instance.heartbeatEnable())
         {
             Set<String> ksNames = HBUtils.getReadCommandRelatedKeySpaceNames(command);
-            boolean superset = true;
-            for (String ks : ksNames)
+            if(!HBUtils.SYSTEM_KEYSPACES.containsAll(ksNames))
             {
-                if (!HBUtils.SYSTEM_KEYSPACES.contains(ks))
-                {
-                    superset = false;
-                    break;
-                }
-            }
-            if (!superset)
-            {
+                logger.info("Read [SelectStatement], check whether has latest data");
                 if (StatusMap.instance.hasLatestValue(command, now))
                 {
-                    logger.info("execute: hasLatestValue -> {}", "true");
+                    logger.info("Read [SelectStatement], current node has latest data");
                 }
                 else
                 {
-                    logger.info("execute: hasLatestValue -> {}", "false");
                     // sink subscription
                     synchronized (lock)
                     {

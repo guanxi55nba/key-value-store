@@ -140,7 +140,7 @@ public class StatusMap
         return hasLatestValue;
     }
 
-    private boolean hasLatestValueImpl(String inKSName, String inKeyStr, ByteBuffer inKey, long inTimestamp)
+    private boolean hasLatestValueImpl(String inKSName, String inKeyStr, ByteBuffer inKey, long inReadTs)
     {
         boolean hasLatestValue = true;
         List<InetAddress> replicaList = HBUtils.getReplicaListExcludeLocal(inKSName, inKey);
@@ -148,11 +148,11 @@ public class StatusMap
         {
             Status status = getStatusFromEntryMap(m_currentEntries, inKeyStr, sourceName.getHostAddress());
             long updateTs = status.getUpdateTs();
-            if (updateTs <= inTimestamp)
+            if (updateTs <= inReadTs)
             {
                 hasLatestValue = false;
-                logger.info("StatusMap::hasLatestValueImpl, {}, hasLatestValue == false, update ts [{}] <= inTimestamp [{}]", hasLatestValue,
-                        HBUtils.dateFormat(updateTs), HBUtils.dateFormat(inTimestamp));
+                logger.info("StatusMap::hasLatestValueImpl,  hasLatestValue == {}, status latest update ts [{}] <= read ts [{}]", hasLatestValue,
+                        HBUtils.dateFormat(updateTs), HBUtils.dateFormat(inReadTs));
             }
             else
             {
@@ -165,7 +165,7 @@ public class StatusMap
                     if (vn >= 0)
                     {
                         long ts = entry.getValue();
-                        if (ts <= inTimestamp)
+                        if (ts <= inReadTs)
                         {
                             hasLatestValue = false;
                             if (vn > latestVersion)

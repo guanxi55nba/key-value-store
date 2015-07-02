@@ -9,6 +9,8 @@ import org.apache.cassandra.net.MessageIn;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.sun.corba.se.impl.protocol.giopmsgheaders.Message;
+
 /**
  * Registered in Storage Service
  * 
@@ -21,6 +23,7 @@ public class HeartBeatVerbHandler implements IVerbHandler<StatusSynMsg> {
 
 	@Override
 	public void doVerb(MessageIn<StatusSynMsg> message, int id) {
+	    //logger.info("message size: {}", message.payload.getData().size());
 		if(ConfReader.instance.heartbeatEnable()) {
 			//String srcName = DatabaseDescriptor.getEndpointSnitch().getDatacenter(from);
 			String srcName = message.from.getHostAddress();

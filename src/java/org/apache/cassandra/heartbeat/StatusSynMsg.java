@@ -207,7 +207,7 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
         out.writeUTF(msg.ksName);
         out.writeUTF(msg.srcName);
         out.writeLong(msg.getTimestamp());
-        ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> data = msg.getData();
+        ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> data = msg.dataCopy();
         int dataSize = data.size();
         out.writeInt(dataSize);
         if (dataSize > 0)

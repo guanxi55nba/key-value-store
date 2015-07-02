@@ -86,6 +86,7 @@ public class ReadHandler
                 // logger.info("ReadHandler.notifySubscription: ts<=timestamp");
                 if (StatusMap.instance.hasLatestValue(sub.getPageable(), sub.getTimestamp()))
                 {
+                    //logger.info("Arraive status message with timestamp {}", HBUtils.dateFormat(msgTs));
                     vnToSubs.remove(sub);
                     synchronized (sub.getLockObject())
                     {
@@ -132,7 +133,7 @@ public class ReadHandler
             String inKey)
     {
         ConcurrentHashMap<String, ConcurrentSkipListSet<Subscription>> newKeyToVersionSubs = new ConcurrentHashMap<String, ConcurrentSkipListSet<Subscription>>();
-        ConcurrentHashMap<String, ConcurrentSkipListSet<Subscription>> keyToVersionSubs = m_subscriptionMatrics.put(inKsName, newKeyToVersionSubs);
+        ConcurrentHashMap<String, ConcurrentSkipListSet<Subscription>> keyToVersionSubs = m_subscriptionMatrics.putIfAbsent(inKsName, newKeyToVersionSubs);
         if (keyToVersionSubs == null)
             keyToVersionSubs = newKeyToVersionSubs;
 
@@ -146,7 +147,7 @@ public class ReadHandler
     private void updateSubscriptions(String inKsName, String inKey, long inTs, Subscription inSub)
     {
         ConcurrentHashMap<String, ConcurrentSkipListSet<Subscription>> newKeyToVersionSubs = new ConcurrentHashMap<String, ConcurrentSkipListSet<Subscription>>();
-        ConcurrentHashMap<String, ConcurrentSkipListSet<Subscription>> keyToVersionSubs = m_subscriptionMatrics.put(inKsName, newKeyToVersionSubs);
+        ConcurrentHashMap<String, ConcurrentSkipListSet<Subscription>> keyToVersionSubs = m_subscriptionMatrics.putIfAbsent(inKsName, newKeyToVersionSubs);
         if (keyToVersionSubs == null)
             keyToVersionSubs = newKeyToVersionSubs;
 

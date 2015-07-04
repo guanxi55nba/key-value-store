@@ -4,12 +4,11 @@ import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.db.ConsistencyLevel;
 import org.apache.cassandra.heartbeat.status.StatusMap;
 import org.apache.cassandra.heartbeat.utils.ConfReader;
+import org.apache.cassandra.heartbeat.utils.HBUtils;
 import org.apache.cassandra.net.IVerbHandler;
 import org.apache.cassandra.net.MessageIn;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.sun.corba.se.impl.protocol.giopmsgheaders.Message;
 
 /**
  * Registered in Storage Service
@@ -23,7 +22,7 @@ public class HeartBeatVerbHandler implements IVerbHandler<StatusSynMsg> {
 
 	@Override
 	public void doVerb(MessageIn<StatusSynMsg> message, int id) {
-	    //logger.info("message size: {}", message.payload.getData().size());
+	    //logger.info("message size: {}, ts: {}", message.payload.getData().size(), HBUtils.dateFormat(message.payload.getTimestamp()) );
 		if(ConfReader.instance.heartbeatEnable()) {
 			//String srcName = DatabaseDescriptor.getEndpointSnitch().getDatacenter(from);
 			String srcName = message.from.getHostAddress();

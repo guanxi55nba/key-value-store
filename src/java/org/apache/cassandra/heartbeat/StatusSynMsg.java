@@ -83,11 +83,14 @@ public class StatusSynMsg
         return m_data;
     }
     
-    ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> dataCopy()
+    ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> getNonEmmptyData()
     {
         ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> dataCopy = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>();
         for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : m_data.entrySet())
-            dataCopy.put(entry.getKey(), new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
+        {
+            if (!entry.getValue().isEmpty())
+                dataCopy.put(entry.getKey(), new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
+        }
         return dataCopy;
     }
 
@@ -171,23 +174,19 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
     {
         out.writeUTF(msg.ksName);
         out.writeLong(msg.getTimestamp());
-        ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> data = msg.dataCopy();
+        ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> data = msg.getNonEmmptyData();
         int dataSize = data.size();
         out.writeInt(dataSize);
         if (dataSize > 0)
         {
             for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : data.entrySet())
             {
-                int valueSize = entry.getValue().size();
-                out.writeInt(valueSize);
-                if (valueSize > 0)
+                out.writeInt(entry.getValue().size());
+                out.writeUTF(entry.getKey());
+                for (Map.Entry<Long, Long> inner : entry.getValue().entrySet())
                 {
-                    out.writeUTF(entry.getKey());
-                    for (Map.Entry<Long, Long> inner : entry.getValue().entrySet())
-                    {
-                        out.writeLong(inner.getKey());
-                        out.writeLong(inner.getValue());
-                    }
+                    out.writeLong(inner.getKey());
+                    out.writeLong(inner.getValue());
                 }
             }
         }
@@ -205,14 +204,11 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
             for (int i = 0; i < dataSize; i++)
             {
                 int valueSize = in.readInt();
-                if (valueSize > 0)
-                {
-                    String key = in.readUTF();
-                    ConcurrentSkipListMap<Long, Long> maps = new ConcurrentSkipListMap<Long, Long>();
-                    for (int j = 0; j < valueSize; j++)
-                        maps.put(in.readLong(), in.readLong());
-                    data.put(key, maps);
-                }
+                String key = in.readUTF();
+                ConcurrentSkipListMap<Long, Long> maps = new ConcurrentSkipListMap<Long, Long>();
+                for (int j = 0; j < valueSize; j++)
+                    maps.put(in.readLong(), in.readLong());
+                data.put(key, maps);
             }
         }
         return new StatusSynMsg(ksName,  data, timestamp);
@@ -241,16 +237,12 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
         {
             for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : statusMsgSyn.getData().entrySet())
             {
-                int valueSize = entry.getValue().size();
-                size += TypeSizes.NATIVE.sizeof(valueSize);
-                if (valueSize > 0)
+                size += TypeSizes.NATIVE.sizeof(entry.getValue().size());
+                size += TypeSizes.NATIVE.sizeof(entry.getKey());
+                for (Map.Entry<Long, Long> inner : entry.getValue().entrySet())
                 {
-                    size += TypeSizes.NATIVE.sizeof(entry.getKey());
-                    for (Map.Entry<Long, Long> inner : entry.getValue().entrySet())
-                    {
-                        size += TypeSizes.NATIVE.sizeof(inner.getKey());
-                        size += TypeSizes.NATIVE.sizeof(inner.getValue());
-                    }
+                    size += TypeSizes.NATIVE.sizeof(inner.getKey());
+                    size += TypeSizes.NATIVE.sizeof(inner.getValue());
                 }
             }
         }

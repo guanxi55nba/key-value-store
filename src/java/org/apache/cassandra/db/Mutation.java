@@ -215,7 +215,7 @@ public class Mutation implements IMutation
         ks.apply(this, ks.metadata.durableWrites);
         
         if(ConfReader.instance.heartbeatEnable()) 
-        	HeartBeater.instance.updateStatusMsgMap(this.copy());
+            HeartBeater.instance.updateStatusMsgMap(keyspaceName, key, modifications.values());
     }
 
     public void applyUnsafe()

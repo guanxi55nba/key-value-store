@@ -163,7 +163,7 @@ public class StatusSynMsg
     
     public StatusSynMsg copy()
     {
-        return new StatusSynMsg(ksName, m_data, timestamp);
+        return new StatusSynMsg(ksName, getNonEmmptyData(), timestamp);
     }
 }
 

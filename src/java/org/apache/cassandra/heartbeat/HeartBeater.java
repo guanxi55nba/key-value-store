@@ -43,27 +43,29 @@ import com.google.common.util.concurrent.Uninterruptibles;
  * 
  */
 public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterMBean {
-	private static final Logger logger = LoggerFactory.getLogger(HeartBeater.class);
-	private static final String MBEAN_NAME = "org.apache.cassandra.net:type=HeartBeater";
-	private static final DebuggableScheduledThreadPoolExecutor executor = new DebuggableScheduledThreadPoolExecutor("HeartBeatTasks");
-	public final static int intervalInMillis = ConfReader.instance.getHeartbeatInterval();
-	private final Comparator<InetAddress> inetcomparator = new Comparator<InetAddress>() {
-		public int compare(InetAddress addr1, InetAddress addr2) {
-			return addr1.getHostAddress().compareTo(addr2.getHostAddress());
-		}
-	};
-	Set<InetAddress> destinations = new ConcurrentSkipListSet<InetAddress>(inetcomparator);
+    private static final Logger logger = LoggerFactory.getLogger(HeartBeater.class);
+    private static final String MBEAN_NAME = "org.apache.cassandra.net:type=HeartBeater";
+    private static final DebuggableScheduledThreadPoolExecutor executor = new DebuggableScheduledThreadPoolExecutor("HeartBeatTasks");
+    public final static int intervalInMillis = ConfReader.instance.getHeartbeatInterval();
+    private final Comparator<InetAddress> inetcomparator = new Comparator<InetAddress>()
+    {
+        public int compare(InetAddress addr1, InetAddress addr2)
+        {
+            return addr1.getHostAddress().compareTo(addr2.getHostAddress());
+        }
+    };
+    Set<InetAddress> destinations = new ConcurrentSkipListSet<InetAddress>(inetcomparator);
 
-	/**
-	 * Used to send out status message
-	 */
-	ConcurrentHashMap<InetAddress, StatusSynMsg> m_statusMsgMap = new ConcurrentHashMap<InetAddress, StatusSynMsg>();
-	private final ConcurrentHashMap<String, ConcurrentHashMap<ByteBuffer, AtomicLong>> m_versionMaps = new ConcurrentHashMap<String, ConcurrentHashMap<ByteBuffer, AtomicLong>>();
-	private ScheduledFuture<?> scheduledHeartBeatTask;
-	public static final HeartBeater instance = new HeartBeater();
-	private String localSrcName = HBUtils.getLocalAddress().getHostAddress();
-	private boolean enable = ConfReader.instance.heartbeatEnable();
-	
+    /**
+     * Used to send out status message
+     */
+    ConcurrentHashMap<InetAddress, StatusSynMsg> m_statusMsgMap = new ConcurrentHashMap<InetAddress, StatusSynMsg>();
+    private final ConcurrentHashMap<String, ConcurrentHashMap<ByteBuffer, AtomicLong>> m_versionMaps = new ConcurrentHashMap<String, ConcurrentHashMap<ByteBuffer, AtomicLong>>();
+    private ScheduledFuture<?> scheduledHeartBeatTask;
+    public static final HeartBeater instance = new HeartBeater();
+    private String localSrcName = HBUtils.getLocalAddress().getHostAddress();
+    private boolean enable = ConfReader.instance.heartbeatEnable();
+    
 
     private HeartBeater()
     {
@@ -113,8 +115,8 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
         }
         
     }
-	
-	private class HeartBeatTask implements Runnable {
+    
+    private class HeartBeatTask implements Runnable {
         @Override
         public void run()
         {
@@ -140,7 +142,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
             }
         }
     }
-	
+    
     public long getKeyVersionNo(String inKSName, ByteBuffer inKey)
     {
         AtomicLong version = new AtomicLong(-1);
@@ -154,11 +156,11 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
         return savedVersion.incrementAndGet();
     }
 
-	/**
-	 * Called by {@link Mutation.apply}
-	 * 
-	 * @param mutation
-	 */
+    /**
+     * Called by {@link Mutation.apply}
+     * 
+     * @param mutation
+     */
     public void updateStatusMsgMap(final String ksName, ByteBuffer partitionKey, final Collection<ColumnFamily> CF)
     {
         if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName))
@@ -181,46 +183,52 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
         }
     }
 
-	/**
-	 * Called by {@link #initializeStatusMsg} & {@link #updateStatusMsgMap }
-	 * 
-	 * @param inKSName
-	 * @param inCFName
-	 * @param partitionKey
-	 * @param value
-	 */
-	private void updateStatusMsgMap(String inKSName, String inCFName, ByteBuffer partitionKey, Row value) {
-		if (value != null) {
-			try {
-				String source = value.getString(HBConsts.SOURCE);
-				long vn = localSrcName.equalsIgnoreCase(source) ? value.getLong(HBConsts.VERSON_NO) : -1;
-				long ts = value.getLong(HBConsts.VERSION_WRITE_TIME) / 1000;
+    /**
+     * Called by {@link #initializeStatusMsg} & {@link #updateStatusMsgMap }
+     * 
+     * @param inKSName
+     * @param inCFName
+     * @param partitionKey
+     * @param value
+     */
+    private void updateStatusMsgMap(String inKSName, String inCFName, ByteBuffer partitionKey, Row value)
+    {
+        if (value != null)
+        {
+            try
+            {
+                String source = value.getString(HBConsts.SOURCE);
+                long vn = localSrcName.equalsIgnoreCase(source) ? value.getLong(HBConsts.VERSON_NO) : -1;
+                long ts = value.getLong(HBConsts.VERSION_WRITE_TIME) / 1000;
                 ConcurrentHashMap<ByteBuffer, AtomicLong> keyToVn = m_versionMaps.get(inKSName);
                 if (keyToVn == null)
                 {
                     keyToVn = new ConcurrentHashMap<ByteBuffer, AtomicLong>();
                     m_versionMaps.put(inKSName, keyToVn);
                 }
-				keyToVn.put(partitionKey, new AtomicLong(vn));
-				updateStatusMsgMap(inKSName, inCFName, partitionKey, vn, ts);
-			} catch (Exception e) {
-				logger.debug("Exception when update status msg mp", e);
-			}
-		}
-	}
+                keyToVn.put(partitionKey, new AtomicLong(vn));
+                updateStatusMsgMap(inKSName, inCFName, partitionKey, vn, ts);
+            }
+            catch (Exception e)
+            {
+                logger.debug("Exception when update status msg mp", e);
+            }
+        }
+    }
 
-	/**
-	 * Update status map info
-	 * 
-	 * @param partitionKey
-	 * @param version
-	 * @param ts
-	 */
-	private void updateStatusMsgMap(String inKSName, String inCFName, ByteBuffer partitionKey, Long version, long ts) {
-	    CFMetaData cfMetaData = Schema.instance.getKSMetaData(inKSName).cfMetaData().get(inCFName);
-	    updateStatusMsgMap(inKSName, cfMetaData, partitionKey, version, ts);
-	}
-	
+    /**
+     * Update status map info
+     * 
+     * @param partitionKey
+     * @param version
+     * @param ts
+     */
+    private void updateStatusMsgMap(String inKSName, String inCFName, ByteBuffer partitionKey, Long version, long ts)
+    {
+        CFMetaData cfMetaData = Schema.instance.getKSMetaData(inKSName).cfMetaData().get(inCFName);
+        updateStatusMsgMap(inKSName, cfMetaData, partitionKey, version, ts);
+    }
+    
     private void updateStatusMsgMap(String inKSName, CFMetaData cfMetaData, ByteBuffer partitionKey, Long version, long ts)
     {
         List<InetAddress> replicaList = HBUtils.getReplicaListExcludeLocal(inKSName, partitionKey);

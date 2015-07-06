@@ -4,7 +4,6 @@ import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
@@ -130,12 +129,10 @@ public class StatusMap
         boolean isReadcommand = !isReadCommands && pageable instanceof ReadCommand;
         if (isReadCommands || isReadcommand)
         {
-            List<ReadCommand> readCommands = (isReadcommand) ? Lists.newArrayList((ReadCommand) pageable)
-                    : ((Pageable.ReadCommands) pageable).commands;
+            List<ReadCommand> readCommands = (isReadcommand) ? Lists.newArrayList((ReadCommand) pageable) : ((Pageable.ReadCommands) pageable).commands;
             for (ReadCommand cmd : readCommands)
             {
-                String key = HBUtils.byteBufferToString(cmd.ksName, cmd.cfName, cmd.key);
-                if (!hasLatestValueImpl(cmd.ksName, key, cmd.key, inTimestamp))
+                if (!hasLatestValueImpl(cmd.ksName, cmd.key, inTimestamp))
                 {
                     hasLatestValue = false;
                     break;
@@ -154,10 +151,11 @@ public class StatusMap
         return hasLatestValue;
     }
 
-    private boolean hasLatestValueImpl(String inKSName, String inKeyStr, ByteBuffer inKey, long inReadTs)
+    private boolean hasLatestValueImpl(String inKSName, ByteBuffer inKey, long inReadTs)
     {
         boolean hasLatestValue = true;
         List<InetAddress> replicaList = HBUtils.getReplicaListExcludeLocal(inKSName, inKey);
+        String inKeyStr = HBUtils.byteBufferToString(inKey);
         for (InetAddress sourceName : replicaList)
         {
             Status status = getStatusFromEntryMap(m_currentEntries, inKeyStr, sourceName.getHostAddress());
@@ -170,28 +168,28 @@ public class StatusMap
             }
             else
             {
-                long latestVersion = DEFAULT_LATEST_VN;
-                TreeMap<Long, Long> versions = status.getVnToTsMap(); // vn: ts
+                //long latestVersion = DEFAULT_LATEST_VN;
+                ConcurrentSkipListMap<Long, Long> versions = status.getVnToTsMap(); // vn: ts
                 // if doesn't exist entry whose timestamp < inTimestamp, then this node contains the latest data
                 for (Map.Entry<Long, Long> entry : versions.entrySet())
                 {
-                    long vn = entry.getKey();
-                    if (vn >= 0)
+                    if (entry.getKey() >= 0)
                     {
                         long ts = entry.getValue();
                         if (ts <= inReadTs)
                         {
                             hasLatestValue = false;
-                            if (vn > latestVersion)
-                                latestVersion = vn;
+                            break;
+                            /*if (vn > latestVersion)
+                                latestVersion = vn;*/
                         }
                     }
                 }
-                if (latestVersion != DEFAULT_LATEST_VN) // Wait for mutation
+                /*if (latestVersion != DEFAULT_LATEST_VN) // Wait for mutation
                 {
                     hasLatestValue = false;
                     logger.info("StatusMap::hasLatestValueImpl, hasLatestValue == false, latestVersion == ", latestVersion);
-                }
+                }*/
             }
         }
         return hasLatestValue;

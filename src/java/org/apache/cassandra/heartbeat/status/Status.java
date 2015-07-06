@@ -72,8 +72,8 @@ public class Status
         return m_updateTs;
     }
 
-    public TreeMap<Long, Long> getVnToTsMap()
+    public ConcurrentSkipListMap<Long, Long> getVnToTsMap()
     {
-        return new TreeMap<Long, Long>(m_currentVnToTs);
+        return m_currentVnToTs;
     }
 }

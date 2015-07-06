@@ -111,7 +111,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
         synchronized (m_statusMsgMap)
         {
             for (KeyMetaData keyMetaData : keys)
-                updateStatusMsgMap(keyMetaData.getKsName(), keyMetaData.getCfName(), keyMetaData.getKey(), keyMetaData.getRow());
+                updateStatusMsgMap(keyMetaData.getKsName(), keyMetaData.getKey(), keyMetaData.getRow());
         }
         
     }
@@ -173,7 +173,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
                 {
                     long versionNo = localSrcName.equalsIgnoreCase(source) ? vn.getLocalVersion() : -1;
                     long timestamp = vn.getTimestamp() / 1000;
-                    updateStatusMsgMap(ksName, cf.metadata(), partitionKey, versionNo, timestamp);
+                    updateStatusMsgMap(ksName, partitionKey, versionNo, timestamp);
                 }
                 else
                 {
@@ -191,7 +191,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
      * @param partitionKey
      * @param value
      */
-    private void updateStatusMsgMap(String inKSName, String inCFName, ByteBuffer partitionKey, Row value)
+    private void updateStatusMsgMap(String inKSName, ByteBuffer partitionKey, Row value)
     {
         if (value != null)
         {
@@ -207,7 +207,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
                     m_versionMaps.put(inKSName, keyToVn);
                 }
                 keyToVn.put(partitionKey, new AtomicLong(vn));
-                updateStatusMsgMap(inKSName, inCFName, partitionKey, vn, ts);
+                updateStatusMsgMap(inKSName, partitionKey, vn, ts);
             }
             catch (Exception e)
             {
@@ -223,13 +223,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
      * @param version
      * @param ts
      */
-    private void updateStatusMsgMap(String inKSName, String inCFName, ByteBuffer partitionKey, Long version, long ts)
-    {
-        CFMetaData cfMetaData = Schema.instance.getKSMetaData(inKSName).cfMetaData().get(inCFName);
-        updateStatusMsgMap(inKSName, cfMetaData, partitionKey, version, ts);
-    }
-    
-    private void updateStatusMsgMap(String inKSName, CFMetaData cfMetaData, ByteBuffer partitionKey, Long version, long ts)
+    private void updateStatusMsgMap(String inKSName, ByteBuffer partitionKey, Long version, long ts)
     {
         List<InetAddress> replicaList = HBUtils.getReplicaListExcludeLocal(inKSName, partitionKey);
         for (InetAddress inetAddress : replicaList)
@@ -242,7 +236,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
                 if (statusMsgSyn == null)
                     statusMsgSyn = newMsg;
             }
-            statusMsgSyn.addKeyVersion(HBUtils.byteBufferToString(cfMetaData, partitionKey), version, ts);
+            statusMsgSyn.addKeyVersion(HBUtils.byteBufferToString( partitionKey), version, ts);
         }
     }
     

@@ -100,7 +100,7 @@ public class KeyStatus
         if (status == null)
         {
             Status temp = new Status();
-            status = m_keyStatusMap.putIfAbsent(key, status);
+            status = m_keyStatusMap.putIfAbsent(key, temp);
             if (status == null)
                 status = temp;
         }

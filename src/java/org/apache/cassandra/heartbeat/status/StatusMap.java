@@ -87,7 +87,7 @@ public class StatusMap
         if (keyStatus == null)
         {
             KeyStatus temp2 = new KeyStatus();
-            keyStatus = srcToKeyStatus.putIfAbsent(srcName, keyStatus);
+            keyStatus = srcToKeyStatus.putIfAbsent(srcName, temp2);
             if (keyStatus == null)
                 keyStatus = temp2;
         }

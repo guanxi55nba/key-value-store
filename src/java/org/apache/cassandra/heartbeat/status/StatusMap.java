@@ -174,16 +174,15 @@ public class StatusMap
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<String, ConcurrentHashMap<String, KeyStatus>> entry : m_currentEntries.entrySet())
         {
-            sb.append("src: ");
             sb.append(entry.getKey());
             sb.append(", ");
-            sb.append("status number: (");
+            sb.append("status number: ( ");
             sb.append(entry.getValue().keySet().size());
             sb.append(", ");
             sb.append(entry.getValue().values().size());
             sb.append(" ) ");
         }
-        logger.info("StatusMap: {}", sb.toString());
+        logger.info("StatusMap -> {}", sb.toString());
     }
 
 }

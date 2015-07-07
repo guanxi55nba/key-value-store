@@ -5,14 +5,12 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
 
 import org.apache.cassandra.db.Cell;
 import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.RangeSliceCommand;
 import org.apache.cassandra.db.ReadCommand;
-import org.apache.cassandra.heartbeat.status.StatusMap;
 import org.apache.cassandra.heartbeat.utils.HBUtils;
 import org.apache.cassandra.service.pager.Pageable;
 import org.slf4j.Logger;

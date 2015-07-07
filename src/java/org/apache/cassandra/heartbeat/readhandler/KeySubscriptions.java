@@ -46,7 +46,6 @@ public class KeySubscriptions
                 inSub.getLockObject().notify();
                 HBUtils.info("Read subscription {} is notified before adding it", inSub.m_version);
             }
-            notifySubscriptionsImpl(inTs, subs, true);
         }
         else
         {

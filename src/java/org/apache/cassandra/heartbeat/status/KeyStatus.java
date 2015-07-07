@@ -60,8 +60,10 @@ public class KeyStatus
                     Status status = getStatus(key);
                     status.removeEntry(version.getTimestamp(), version.getTimestamp());
                 }
-                
-                HBUtils.error("KeyStatus::updateStatus, version value is null, ColumnFamily: {}", cf.toString());
+                else
+                {
+                    HBUtils.error("KeyStatus::updateStatus, version value is null, ColumnFamily: {}", cf.toString());
+                }
             }
         }
     }

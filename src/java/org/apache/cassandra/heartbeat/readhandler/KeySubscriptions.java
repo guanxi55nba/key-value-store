@@ -3,9 +3,7 @@ package org.apache.cassandra.heartbeat.readhandler;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListMap;
 
-import org.apache.cassandra.heartbeat.status.Status;
 import org.apache.cassandra.heartbeat.status.StatusMap;
-import org.apache.cassandra.heartbeat.utils.HBUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,19 +36,7 @@ public class KeySubscriptions
                 subs = temp;
         }
         
-        // Check before adding it
-        if (StatusMap.instance.hasLatestValue(inSub))
-        {
-            synchronized (inSub.getLockObject())
-            {
-                inSub.getLockObject().notify();
-                HBUtils.info("Read subscription {} is notified before adding it", inSub.m_version);
-            }
-        }
-        else
-        {
-            subs.add(inSub);
-        }
+        subs.add(inSub);
     }
     
     public void notifySubscription(long msgTs)

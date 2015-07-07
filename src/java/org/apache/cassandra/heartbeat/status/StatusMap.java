@@ -11,6 +11,7 @@ import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.RangeSliceCommand;
 import org.apache.cassandra.db.ReadCommand;
 import org.apache.cassandra.heartbeat.StatusSynMsg;
+import org.apache.cassandra.heartbeat.readhandler.KeySubscriptions;
 import org.apache.cassandra.heartbeat.readhandler.Subscription;
 import org.apache.cassandra.heartbeat.utils.HBUtils;
 import org.apache.cassandra.service.pager.Pageable;
@@ -172,17 +173,35 @@ public class StatusMap
     private void showStatusNo()
     {
         StringBuilder sb = new StringBuilder();
-        for (Map.Entry<String, ConcurrentHashMap<String, KeyStatus>> entry : m_currentEntries.entrySet())
+        if (m_currentEntries.size() > 0)
         {
-            sb.append(entry.getKey());
-            sb.append(", ");
-            sb.append("status number: ( ");
-            sb.append(entry.getValue().keySet().size());
-            sb.append(", ");
-            sb.append(entry.getValue().values().size());
-            sb.append(" ) ");
+            for (Map.Entry<String, ConcurrentHashMap<String, KeyStatus>> entry : m_currentEntries.entrySet())
+            {
+                sb.append(" [ ");
+                sb.append(entry.getKey());
+                sb.append(": ");
+                sb.append("{");
+                if (entry.getValue().size() > 0)
+                {
+                    for (Map.Entry<String, KeyStatus> subEntry : entry.getValue().entrySet())
+                    {
+                        sb.append(subEntry.getKey());
+                        sb.append(": ");
+                        sb.append(subEntry.getValue().size());
+                        sb.append(", ");
+                    }
+                    sb.setCharAt(sb.length() - 2, ' ');
+                    sb.setCharAt(sb.length() - 1, '}');
+                }
+                else
+                {
+                    sb.append("}");
+                }
+                sb.append("],");
+            }
+            sb.setCharAt(sb.length() - 1, ' ');
         }
-        logger.info("StatusMap -> {}", sb.toString());
+        logger.info("StatusMap -> ({} ) ", sb.toString());
     }
 
 }

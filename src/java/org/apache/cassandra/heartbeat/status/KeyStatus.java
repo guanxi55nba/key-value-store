@@ -108,4 +108,9 @@ public class KeyStatus
         return status;
     }
     
+    public int size()
+    {
+        return m_keyStatusMap.values().size();
+    }
+    
 }

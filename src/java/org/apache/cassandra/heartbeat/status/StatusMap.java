@@ -172,36 +172,36 @@ public class StatusMap
     
     private void showStatusNo()
     {
-        StringBuilder sb = new StringBuilder();
-        if (m_currentEntries.size() > 0)
-        {
-            for (Map.Entry<String, ConcurrentHashMap<String, KeyStatus>> entry : m_currentEntries.entrySet())
-            {
-                sb.append(" [ ");
-                sb.append(entry.getKey());
-                sb.append(": ");
-                sb.append("{");
-                if (entry.getValue().size() > 0)
-                {
-                    for (Map.Entry<String, KeyStatus> subEntry : entry.getValue().entrySet())
-                    {
-                        sb.append(subEntry.getKey());
-                        sb.append(": ");
-                        sb.append(subEntry.getValue().size());
-                        sb.append(", ");
-                    }
-                    sb.setCharAt(sb.length() - 2, ' ');
-                    sb.setCharAt(sb.length() - 1, '}');
-                }
-                else
-                {
-                    sb.append("}");
-                }
-                sb.append("],");
-            }
-            sb.setCharAt(sb.length() - 1, ' ');
-        }
-        logger.info("StatusMap -> ({} ) ", sb.toString());
+//        StringBuilder sb = new StringBuilder();
+//        if (m_currentEntries.size() > 0)
+//        {
+//            for (Map.Entry<String, ConcurrentHashMap<String, KeyStatus>> entry : m_currentEntries.entrySet())
+//            {
+//                sb.append(" [ ");
+//                sb.append(entry.getKey());
+//                sb.append(": ");
+//                sb.append("{");
+//                if (entry.getValue().size() > 0)
+//                {
+//                    for (Map.Entry<String, KeyStatus> subEntry : entry.getValue().entrySet())
+//                    {
+//                        sb.append(subEntry.getKey());
+//                        sb.append(": ");
+//                        sb.append(subEntry.getValue().size());
+//                        sb.append(", ");
+//                    }
+//                    sb.setCharAt(sb.length() - 2, ' ');
+//                    sb.setCharAt(sb.length() - 1, '}');
+//                }
+//                else
+//                {
+//                    sb.append("}");
+//                }
+//                sb.append("],");
+//            }
+//            sb.setCharAt(sb.length() - 1, ' ');
+//        }
+//        HBUtils.info("StatusMap -> ({} ) ", sb.toString());
     }
 
 }

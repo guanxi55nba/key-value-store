@@ -70,7 +70,7 @@ public class ReadHandler
         if (page != null)
         {
             Subscription subscription = new Subscription(page, ts, lock, version);
-            if (page instanceof Pageable.ReadCommands)
+            if (page instanceof ReadCommand)
             {
                 ReadCommand cmd = (ReadCommand) page;
                 addSubscriptions(cmd.ksName, HBUtils.byteBufferToString(cmd.key), ts, subscription);

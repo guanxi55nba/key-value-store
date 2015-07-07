@@ -108,7 +108,7 @@ public class StatusMap
     public boolean hasLatestValue(Pageable pageable, long inTimestamp)
     {
         boolean hasLatestValue = true;
-        if (pageable instanceof Pageable.ReadCommands)
+        if (pageable instanceof ReadCommand)
         {
             ReadCommand cmd = (ReadCommand) pageable;
             if (!hasLatestValueImpl(cmd.ksName, cmd.key, inTimestamp))

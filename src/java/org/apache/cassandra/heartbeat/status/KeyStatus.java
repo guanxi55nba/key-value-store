@@ -9,7 +9,6 @@ import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.heartbeat.StatusSynMsg;
 import org.apache.cassandra.heartbeat.extra.Version;
 import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
-import org.apache.cassandra.heartbeat.utils.ConfReader;
 import org.apache.cassandra.heartbeat.utils.HBUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

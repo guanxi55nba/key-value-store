@@ -3,6 +3,7 @@ package org.apache.cassandra.heartbeat.status;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Map;
 import java.util.Timer;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -171,7 +172,7 @@ public class StatusMap
     private void showStatusNo()
     {
         StringBuilder sb = new StringBuilder();
-        /*for (Map.Entry<String, ConcurrentHashMap<String, KeyStatus>> entry : m_currentEntries.entrySet())
+        for (Map.Entry<String, ConcurrentHashMap<String, KeyStatus>> entry : m_currentEntries.entrySet())
         {
             sb.append("src: ");
             sb.append(entry.getKey());
@@ -181,7 +182,7 @@ public class StatusMap
             sb.append(", ");
             sb.append(entry.getValue().values().size());
             sb.append(" ) ");
-        }*/
+        }
         logger.info("StatusMap: {}", sb.toString());
     }
 

@@ -145,17 +145,24 @@ public class ReadHandler
         {
             StringBuilder sb = new StringBuilder();
             sb.append(entry.getKey());
-            sb.append(" : { ");
-            for (Map.Entry<String, KeySubscriptions> subEntry : entry.getValue().entrySet())
+            sb.append(": { ");
+            if (entry.getValue().size() > 0)
             {
-                sb.append(subEntry.getKey());
-                sb.append(": ");
-                sb.append(subEntry.getValue().size());
-                sb.append(",");
+                for (Map.Entry<String, KeySubscriptions> subEntry : entry.getValue().entrySet())
+                {
+                    sb.append(subEntry.getKey());
+                    sb.append(": ");
+                    sb.append(subEntry.getValue().size());
+                    sb.append(", ");
+                }
+                sb.setCharAt(sb.length() - 2, ' ');
+                sb.setCharAt(sb.length() - 1, '}');
             }
-            sb.setCharAt(sb.length() - 1, ' ');
-            sb.append("}");
-            logger.info(sb.toString());
+            else
+            {
+                sb.append("}");
+            }
+            logger.info("ReadHanlder -> {}",sb.toString());
         }
     }
 }

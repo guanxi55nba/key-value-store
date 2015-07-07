@@ -19,6 +19,7 @@ package org.apache.cassandra.cql3.statements;
 
 import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
@@ -66,6 +67,7 @@ import org.slf4j.LoggerFactory;
  */
 public class SelectStatement implements CQLStatement
 {
+    private static AtomicLong m_version = new AtomicLong();
     private static final Logger logger = LoggerFactory.getLogger(SelectStatement.class);
     private static final int DEFAULT_COUNT_PAGE_SIZE = 10000;
     private byte[] lock = new byte[0];
@@ -213,10 +215,11 @@ public class SelectStatement implements CQLStatement
             Set<String> ksNames = HBUtils.getReadCommandRelatedKeySpaceNames(command);
             if(!HBUtils.SYSTEM_KEYSPACES.containsAll(ksNames))
             {
-                logger.info("Read [SelectStatement], check whether has latest data");
+                long version = m_version.incrementAndGet();
                 if (StatusMap.instance.hasLatestValue(command, now))
                 {
-                    logger.info("Read [SelectStatement], current node has latest data");
+                    //logger.info("Read [SelectStatement], current node has latest data");
+                    HBUtils.error("Read subscription {} is notified", version);
                 }
                 else
                 {
@@ -225,19 +228,18 @@ public class SelectStatement implements CQLStatement
                     {
                         try
                         {
-                            ReadHandler.instance.sinkReadHandler(command, now, lock);
+                            ReadHandler.instance.sinkSubscription(command, now, lock, version);
                             lock.wait();
-                            logger.info("[WaitingThread]: Successfully notified!");
+                            //logger.info("[WaitingThread]: Successfully notified!");
                         }
                         catch (Exception e)
                         {
-                            logger.error("Exception: {}", e.getMessage());
+                            HBUtils.error("Exception: {}", e.getMessage());
                         }
                     }
                 }
             }
         }
-
         if (pageSize <= 0 || command == null || !QueryPagers.mayNeedPaging(command, pageSize))
         {
             return execute(command, options, limit, now, state);

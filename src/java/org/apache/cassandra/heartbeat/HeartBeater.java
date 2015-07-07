@@ -18,8 +18,6 @@ import javax.management.MBeanServer;
 import javax.management.ObjectName;
 
 import org.apache.cassandra.concurrent.DebuggableScheduledThreadPoolExecutor;
-import org.apache.cassandra.config.CFMetaData;
-import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.cql3.UntypedResultSet.Row;
 import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.db.Mutation;
@@ -146,10 +144,15 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
     public long getKeyVersionNo(String inKSName, ByteBuffer inKey)
     {
         AtomicLong version = new AtomicLong(-1);
-        ConcurrentHashMap<ByteBuffer, AtomicLong> newMap = new ConcurrentHashMap<ByteBuffer, AtomicLong>();
-        ConcurrentHashMap<ByteBuffer, AtomicLong> keyToVn = m_versionMaps.putIfAbsent(inKSName, newMap);
+        ConcurrentHashMap<ByteBuffer, AtomicLong> keyToVn = m_versionMaps.get(inKSName);
         if (keyToVn == null)
-            keyToVn = newMap;
+        {
+            ConcurrentHashMap<ByteBuffer, AtomicLong> newMap = new ConcurrentHashMap<ByteBuffer, AtomicLong>();
+            keyToVn = m_versionMaps.putIfAbsent(inKSName, newMap);
+            if (keyToVn == null)
+                keyToVn = newMap;
+        }
+
         AtomicLong savedVersion = keyToVn.putIfAbsent(inKey, version);
         if (savedVersion == null)
             savedVersion = version;

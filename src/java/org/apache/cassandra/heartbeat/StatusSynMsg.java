@@ -43,7 +43,7 @@ public class StatusSynMsg
         if (data != null && !data.isEmpty())
         {
             for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : data.entrySet())
-                m_data.put(entry.getKey(), new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
+                m_data.put(entry.getKey(), entry.getValue().clone());
         }
     }
 
@@ -88,8 +88,7 @@ public class StatusSynMsg
         ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> dataCopy = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>();
         for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : m_data.entrySet())
         {
-            if (!entry.getValue().isEmpty())
-                dataCopy.put(entry.getKey(), new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
+            dataCopy.put(entry.getKey(), entry.getValue().clone());
         }
         return dataCopy;
     }
@@ -181,12 +180,16 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
         {
             for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : data.entrySet())
             {
-                out.writeInt(entry.getValue().size());
                 out.writeUTF(entry.getKey());
-                for (Map.Entry<Long, Long> inner : entry.getValue().entrySet())
+                int valueSize = entry.getValue().size(); 
+                out.writeInt(valueSize);
+                if (valueSize > 0)
                 {
-                    out.writeLong(inner.getKey());
-                    out.writeLong(inner.getValue());
+                    for (Map.Entry<Long, Long> inner : entry.getValue().entrySet())
+                    {
+                        out.writeLong(inner.getKey());
+                        out.writeLong(inner.getValue());
+                    }
                 }
             }
         }
@@ -203,8 +206,8 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
         {
             for (int i = 0; i < dataSize; i++)
             {
-                int valueSize = in.readInt();
                 String key = in.readUTF();
+                int valueSize = in.readInt();
                 ConcurrentSkipListMap<Long, Long> maps = new ConcurrentSkipListMap<Long, Long>();
                 for (int j = 0; j < valueSize; j++)
                     maps.put(in.readLong(), in.readLong());
@@ -237,12 +240,16 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
         {
             for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : statusMsgSyn.getData().entrySet())
             {
-                size += TypeSizes.NATIVE.sizeof(entry.getValue().size());
                 size += TypeSizes.NATIVE.sizeof(entry.getKey());
-                for (Map.Entry<Long, Long> inner : entry.getValue().entrySet())
+                int valueSize = entry.getValue().size();
+                size += TypeSizes.NATIVE.sizeof(valueSize);
+                if (valueSize > 0)
                 {
-                    size += TypeSizes.NATIVE.sizeof(inner.getKey());
-                    size += TypeSizes.NATIVE.sizeof(inner.getValue());
+                    for (Map.Entry<Long, Long> inner : entry.getValue().entrySet())
+                    {
+                        size += TypeSizes.NATIVE.sizeof(inner.getKey());
+                        size += TypeSizes.NATIVE.sizeof(inner.getValue());
+                    }
                 }
             }
         }

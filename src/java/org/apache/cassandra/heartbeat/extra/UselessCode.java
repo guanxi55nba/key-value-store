@@ -115,5 +115,16 @@ public class UselessCode {
 //			}
 //		}
 //	}
+	
+	//private static final long DEFAULT_LATEST_VN = -2;
+	
+    /*if (latestVersion != DEFAULT_LATEST_VN) // Wait for mutation
+    {
+        hasLatestValue = false;
+        logger.info("StatusMap::hasLatestValueImpl, hasLatestValue == false, latestVersion == ", latestVersion);
+    }*/
+	
+    /*if (vn > latestVersion)
+    latestVersion = vn;*/
 
 }

@@ -33,7 +33,7 @@ public class StatusSynMsg
     final String ksName;
     long timestamp;
     private ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> m_data = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>();
-    private HashMap<String, TreeMap<Long, Long>> m_dataCopy = Maps.newHashMap();
+    private HashMap<String, TreeMap<Long, Long>> m_dataCopy;
     
     public StatusSynMsg(String ksName, long timestamp)
     {
@@ -89,8 +89,8 @@ public class StatusSynMsg
             ConcurrentSkipListMap<Long, Long> vnTsMap = m_data.get(entry.getKey());
             if (vnTsMap != null)
             {
-                for (Map.Entry<Long, Long> subEntry : entry.getValue().entrySet())
-                    vnTsMap.remove(subEntry.getKey(), subEntry.getValue());
+                for (Long vn : entry.getValue().keySet())
+                    vnTsMap.remove(vn);
             }
         }
     }
@@ -150,16 +150,13 @@ public class StatusSynMsg
     
     HashMap<String, TreeMap<Long, Long>> getNonEmmptyData()
     {
-        m_dataCopy.clear();
+        HashMap<String, TreeMap<Long, Long>> dataCopy = Maps.newHashMap();
         for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : m_data.entrySet())
         {
-            synchronized (entry.getValue())
-            {
-                if (!entry.getValue().isEmpty())
-                    m_dataCopy.put(entry.getKey(), Maps.newTreeMap(entry.getValue()));
-            }
+            if (!entry.getValue().isEmpty())
+                dataCopy.put(entry.getKey(), Maps.newTreeMap(entry.getValue()));
         }
-        return m_dataCopy;
+        return dataCopy;
     }
     
     public HashMap<String, TreeMap<Long, Long>> getDataCopy()
@@ -193,7 +190,7 @@ public class StatusSynMsg
     {
         this.ksName = ksName;
         this.timestamp = timestamp;
-        if (dataCopy != null && !dataCopy.isEmpty())
+        if (dataCopy != null)
             m_dataCopy = dataCopy;
     }
     
@@ -207,7 +204,7 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
     {
         out.writeUTF(msg.ksName);
         out.writeLong(msg.getTimestamp());
-        HashMap<String, TreeMap<Long, Long>> data = Maps.newHashMap();
+        HashMap<String, TreeMap<Long, Long>> data = msg.getDataCopy();
         int dataSize = data.size();
         out.writeInt(dataSize);
         if (dataSize > 0)
@@ -272,7 +269,7 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
         size += TypeSizes.NATIVE.sizeof(dataSize);
         if (dataSize > 0)
         {
-            for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : statusMsgSyn.getData().entrySet())
+            for (Map.Entry<String, TreeMap<Long, Long>> entry : statusMsgSyn.getDataCopy().entrySet())
             {
                 size += TypeSizes.NATIVE.sizeof(entry.getKey());
                 int valueSize = entry.getValue().size();

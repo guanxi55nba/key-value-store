@@ -67,9 +67,9 @@ public class KeySubscriptions
                 synchronized (sub.getLockObject())
                 {
                     sub.getLockObject().notify();
-                    subs.remove(sub);
-                    logger.error("Read subscription {} is notified", sub.m_version);
                 }
+                subs.remove(sub);
+                logger.error("Read subscription {} is notified", sub.m_version);
             }
         }
         if (subs.isEmpty())

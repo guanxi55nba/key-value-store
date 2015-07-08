@@ -82,16 +82,15 @@ public class StatusSynMsg
         return timestamp;
     }
 
-    /**
-     * set it to {key: [] }
-     */
-    public void cleanData()
+    public void cleanData(HashMap<String, TreeMap<Long, Long>> keyToVns)
     {
-        for (ConcurrentSkipListMap<Long, Long> vnTsMap : m_data.values())
+        for (Map.Entry<String, TreeMap<Long, Long>> entry : keyToVns.entrySet())
         {
-            synchronized (vnTsMap)
+            ConcurrentSkipListMap<Long, Long> vnTsMap = m_data.get(entry.getKey());
+            if (vnTsMap != null)
             {
-                vnTsMap.clear();
+                for (Map.Entry<Long, Long> subEntry : entry.getValue().entrySet())
+                    vnTsMap.remove(subEntry.getKey(), subEntry.getValue());
             }
         }
     }

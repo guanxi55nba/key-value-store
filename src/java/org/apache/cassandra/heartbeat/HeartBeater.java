@@ -135,7 +135,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
                     // logger.info("Send out status msg to {} with msg {}", destination, statusSynMsg.toStringLite());
 
                     // clear status syn msg once is sent out
-                    entry.getValue().cleanData();
+                    entry.getValue().cleanData(statusSynMsg.getDataCopy());;
                 }
             }
         }

@@ -1,6 +1,7 @@
 package org.apache.cassandra.heartbeat.status;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -12,6 +13,8 @@ import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
 import org.apache.cassandra.heartbeat.utils.HBUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.collect.Maps;
 
 
 /**
@@ -26,7 +29,7 @@ public class KeyStatus
 {
     private static final Logger logger = LoggerFactory.getLogger(KeyStatus.class);
     private ConcurrentHashMap<String, Status> m_keyStatusMap; // key, status
-    private volatile long m_updateTs = -1;
+    private long m_updateTs = -1;
     
     public KeyStatus()
     {
@@ -37,8 +40,14 @@ public class KeyStatus
     {
         ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> synMsgData = inSynMsg.getData();
         setUpdateTs(inSynMsg.getTimestamp());
+        String ksName = inSynMsg.getKsName();
         if (m_updateTs > 0)
         {
+            // Notify sinked read handler
+            HashMap<String, Status> copy = Maps.newHashMap(m_keyStatusMap);
+            for (Map.Entry<String, Status> entry : copy.entrySet())
+                ReadHandler.instance.notifySubscription(ksName, entry.getKey(), m_updateTs);
+            
             for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : synMsgData.entrySet())
             {
                 // Get status object and update data
@@ -46,7 +55,7 @@ public class KeyStatus
                 status.addVnTsData(entry.getValue());
 
                 // Notify sinked read handler
-                ReadHandler.instance.notifySubscription(inSynMsg.getKsName(), entry.getKey(), m_updateTs);
+                ReadHandler.instance.notifySubscription(ksName, entry.getKey(), m_updateTs);
             }
         }
     }
@@ -75,8 +84,12 @@ public class KeyStatus
     public boolean hasLatestValue(String key, long inReadTs)
     {
         boolean hasLatestValue = true;
-        Status status = getStatus(key);
-        if (m_updateTs <= inReadTs)
+        Status status = m_keyStatusMap.get(key);
+        if (status == null)
+        {
+            hasLatestValue = false;
+        }
+        else if (m_updateTs <= inReadTs)
         {
             hasLatestValue = false;
             logger.info("KeyStatus::hasLatestValue, key {}, hasLatestValue == {}, status update ts [{}] <= read ts [{}]",
@@ -85,7 +98,7 @@ public class KeyStatus
         else
         {
             ConcurrentSkipListMap<Long, Long> versions = status.getVnToTsMap(); // vn: ts
-            
+
             // if doesn't exist version whose timestamp < read ts, then this node contains the latest data
             for (Map.Entry<Long, Long> entry : versions.entrySet())
             {
@@ -121,11 +134,6 @@ public class KeyStatus
     {
         if (inUpdateTs > m_updateTs)
             m_updateTs = inUpdateTs;
-    }
-
-    public long getUpdateTs()
-    {
-        return m_updateTs;
     }
     
 }

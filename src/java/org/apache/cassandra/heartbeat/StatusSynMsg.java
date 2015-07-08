@@ -42,8 +42,7 @@ public class StatusSynMsg
         this.timestamp = timestamp;
         if (data != null && !data.isEmpty())
         {
-            for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : data.entrySet())
-                m_data.put(entry.getKey(), new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
+            m_data = data;
         }
     }
 
@@ -91,7 +90,7 @@ public class StatusSynMsg
             synchronized (entry.getValue())
             {
                 if (!entry.getValue().isEmpty())
-                    dataCopy.put(entry.getKey(), new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
+                    dataCopy.put(entry.getKey(), entry.getValue().clone());
             }
         }
         return dataCopy;

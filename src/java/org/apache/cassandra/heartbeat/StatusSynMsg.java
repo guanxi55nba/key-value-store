@@ -43,7 +43,7 @@ public class StatusSynMsg
         if (data != null && !data.isEmpty())
         {
             for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : data.entrySet())
-                m_data.put(entry.getKey(), entry.getValue().clone());
+                m_data.put(entry.getKey(), new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
         }
     }
 
@@ -87,8 +87,12 @@ public class StatusSynMsg
     {
         ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> dataCopy = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>();
         for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : m_data.entrySet())
-        {
-            dataCopy.put(entry.getKey(), entry.getValue().clone());
+        { 
+            synchronized (entry.getValue())
+            {
+                if (!entry.getValue().isEmpty())
+                    dataCopy.put(entry.getKey(), new ConcurrentSkipListMap<Long, Long>(entry.getValue()));
+            }
         }
         return dataCopy;
     }
@@ -173,7 +177,7 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
     {
         out.writeUTF(msg.ksName);
         out.writeLong(msg.getTimestamp());
-        ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> data = msg.getNonEmmptyData();
+        ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> data = msg.getData();
         int dataSize = data.size();
         out.writeInt(dataSize);
         if (dataSize > 0)

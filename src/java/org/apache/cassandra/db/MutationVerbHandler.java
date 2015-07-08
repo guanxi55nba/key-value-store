@@ -20,10 +20,12 @@ package org.apache.cassandra.db;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
 import org.apache.cassandra.heartbeat.status.StatusMap;
 import org.apache.cassandra.heartbeat.utils.ConfReader;
+import org.apache.cassandra.heartbeat.utils.HBUtils;
 import org.apache.cassandra.io.util.FastByteArrayInputStream;
 import org.apache.cassandra.net.CompactEndpointSerializationHelper;
 import org.apache.cassandra.net.IVerbHandler;
@@ -37,15 +39,15 @@ import org.slf4j.LoggerFactory;
 public class MutationVerbHandler implements IVerbHandler<Mutation>
 {
     private static final Logger logger = LoggerFactory.getLogger(MutationVerbHandler.class);
-    //private static AtomicInteger m_counter = new AtomicInteger(0);
+    private static AtomicInteger m_counter = new AtomicInteger(0);
 
     public void doVerb(MessageIn<Mutation> message, int id)
     {
         try
         {
-//			if (!HBUtils.SYSTEM_KEYSPACES.contains(message.payload.getKeyspaceName())) {
-//				logger.info("mutation number {}", m_counter.incrementAndGet());
-//			}
+			if (!HBUtils.SYSTEM_KEYSPACES.contains(message.payload.getKeyspaceName())) {
+				logger.info("mutation number {}", m_counter.incrementAndGet());
+			}
             // Check if there were any forwarding headers in this message
             byte[] from = message.parameters.get(Mutation.FORWARD_FROM);
             InetAddress replyTo;

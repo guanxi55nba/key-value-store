@@ -11,64 +11,45 @@ import java.util.concurrent.ConcurrentSkipListMap;
  */
 public class Status
 {
-    private volatile long m_updateTs;
     private ConcurrentSkipListMap<Long, Long> m_currentVnToTs;
     private ConcurrentSkipListMap<Long, Long> m_removedVnToTs = new ConcurrentSkipListMap<Long, Long>();
     byte[] m_lockObj = new byte[0];
+    private volatile boolean flag = false;
 
     public Status()
     {
-        m_updateTs = -1;
         m_currentVnToTs = new ConcurrentSkipListMap<Long, Long>();
     }
 
     public void addVnTsData(long inVersionNo, long inTimestamp)
     {
-        synchronized (m_lockObj)
+        boolean temp = flag;
+        if (!m_removedVnToTs.containsKey(inVersionNo))
         {
-            if (!m_removedVnToTs.containsKey(inVersionNo))
-            {
-                m_currentVnToTs.put(inVersionNo, inTimestamp);
-            }
+            m_currentVnToTs.put(inVersionNo, inTimestamp);
         }
     }
     
-    public void addVnTsData(Map<Long, Long> inMap, long inTs)
+    public void addVnTsData(Map<Long, Long> inMap)
     {
-        synchronized (m_lockObj)
+        for (Map.Entry<Long, Long> entry : inMap.entrySet())
         {
-            for (Map.Entry<Long, Long> entry : inMap.entrySet())
+            boolean temp = flag;
+            if (m_removedVnToTs.get(entry.getKey()) != null)
             {
-                if (!m_removedVnToTs.containsKey(entry.getKey()))
-                {
-                    m_currentVnToTs.put(entry.getKey(), entry.getValue());
-                }
+                m_currentVnToTs.put(entry.getKey(), entry.getValue());
             }
-            setUpdateTs(inTs);
         }
     }
     
     public Long removeEntry(Long inVersion, Long inTs)
     {
         boolean removed;
-        synchronized (m_lockObj)
-        {
-            m_removedVnToTs.put(inVersion, inTs);
-            removed = m_currentVnToTs.remove(inVersion, inTs);
-        }
+        m_removedVnToTs.put(inVersion, inTs);
+        flag = true;
+        removed = m_currentVnToTs.remove(inVersion, inTs);
         long ts = removed ? inTs : System.currentTimeMillis();
         return ts;
-    }
-
-    public void setUpdateTs(long inUpdateTs)
-    {
-        if (inUpdateTs > m_updateTs)
-            m_updateTs = inUpdateTs;
-    }
-
-    public long getUpdateTs()
-    {
-        return m_updateTs;
     }
 
     public ConcurrentSkipListMap<Long, Long> getVnToTsMap()

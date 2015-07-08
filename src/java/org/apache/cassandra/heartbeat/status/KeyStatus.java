@@ -15,6 +15,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
+ *  This contains all the keys status from one replica node
+ * 
  *  { key, status, subscription }
  * 
  * @author xig
@@ -24,6 +26,7 @@ public class KeyStatus
 {
     private static final Logger logger = LoggerFactory.getLogger(KeyStatus.class);
     private ConcurrentHashMap<String, Status> m_keyStatusMap; // key, status
+    private volatile long m_updateTs = -1;
     
     public KeyStatus()
     {
@@ -33,16 +36,18 @@ public class KeyStatus
     public void updateStatus(final String inSrc, StatusSynMsg inSynMsg)
     {
         ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> synMsgData = inSynMsg.getData();
-        long timestamp = inSynMsg.getTimestamp();
-        String ksName = inSynMsg.getKsName();
-        for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : synMsgData.entrySet())
+        setUpdateTs(inSynMsg.getTimestamp());
+        if (m_updateTs > 0)
         {
-            // Get status object and update data
-            Status status = getStatus(entry.getKey());
-            status.addVnTsData(entry.getValue(), timestamp);
+            for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : synMsgData.entrySet())
+            {
+                // Get status object and update data
+                Status status = getStatus(entry.getKey());
+                status.addVnTsData(entry.getValue());
 
-            // Notify sinked read handler
-            ReadHandler.instance.notifySubscription(ksName, entry.getKey(), timestamp);
+                // Notify sinked read handler
+                ReadHandler.instance.notifySubscription(inSynMsg.getKsName(), entry.getKey(), m_updateTs);
+            }
         }
     }
     
@@ -71,12 +76,11 @@ public class KeyStatus
     {
         boolean hasLatestValue = true;
         Status status = getStatus(key);
-        long updateTs = status.getUpdateTs();
-        if (updateTs <= inReadTs)
+        if (m_updateTs <= inReadTs)
         {
             hasLatestValue = false;
             logger.info("KeyStatus::hasLatestValue, key {}, hasLatestValue == {}, status update ts [{}] <= read ts [{}]",
-                    key, hasLatestValue, HBUtils.dateFormat(updateTs), HBUtils.dateFormat(inReadTs));
+                    key, hasLatestValue, HBUtils.dateFormat(m_updateTs), HBUtils.dateFormat(inReadTs));
         }
         else
         {
@@ -111,6 +115,17 @@ public class KeyStatus
     public int size()
     {
         return m_keyStatusMap.values().size();
+    }
+    
+    public void setUpdateTs(long inUpdateTs)
+    {
+        if (inUpdateTs > m_updateTs)
+            m_updateTs = inUpdateTs;
+    }
+
+    public long getUpdateTs()
+    {
+        return m_updateTs;
     }
     
 }

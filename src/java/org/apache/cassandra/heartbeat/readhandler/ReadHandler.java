@@ -56,11 +56,16 @@ public class ReadHandler
 
     public void notifySubscription(String ksName, String key, final long msgTs)
     {
-        // Get key subscriptions
-        KeySubscriptions keySubs = getKeySubscriptions(ksName, key);
-
-        // Notify subscriptions
-        keySubs.notifySubscription(msgTs);
+        ConcurrentHashMap<String, KeySubscriptions> keyToSubs = m_subscriptionMatrics.get(ksName);
+        if (keyToSubs != null)
+        {
+            KeySubscriptions keySubs = keyToSubs.get(key);
+            if (keySubs != null)
+            {
+                // Notify subscriptions
+                keySubs.notifySubscription(msgTs);
+            }
+        }
     }
     
     public void sinkSubscription(Pageable page, final long ts, byte[] lock, long version)
@@ -141,28 +146,28 @@ public class ReadHandler
     
     private void showSubscriptionMatrics()
     {
-//        for (Map.Entry<String, ConcurrentHashMap<String, KeySubscriptions>> entry : m_subscriptionMatrics.entrySet())
-//        {
-//            StringBuilder sb = new StringBuilder();
-//            sb.append(entry.getKey());
-//            sb.append(": { ");
-//            if (entry.getValue().size() > 0)
-//            {
-//                for (Map.Entry<String, KeySubscriptions> subEntry : entry.getValue().entrySet())
-//                {
-//                    sb.append(subEntry.getKey());
-//                    sb.append(": ");
-//                    sb.append(subEntry.getValue().size());
-//                    sb.append(", ");
-//                }
-//                sb.setCharAt(sb.length() - 2, ' ');
-//                sb.setCharAt(sb.length() - 1, '}');
-//            }
-//            else
-//            {
-//                sb.append("}");
-//            }
-//            HBUtils.info("ReadHanlder -> {}",sb.toString());
-//        }
+        for (Map.Entry<String, ConcurrentHashMap<String, KeySubscriptions>> entry : m_subscriptionMatrics.entrySet())
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.append(entry.getKey());
+            sb.append(": { ");
+            if (entry.getValue().size() > 0)
+            {
+                for (Map.Entry<String, KeySubscriptions> subEntry : entry.getValue().entrySet())
+                {
+                    sb.append(subEntry.getKey());
+                    sb.append(": ");
+                    sb.append(subEntry.getValue().size());
+                    sb.append(", ");
+                }
+                sb.setCharAt(sb.length() - 2, ' ');
+                sb.setCharAt(sb.length() - 1, '}');
+            }
+            else
+            {
+                sb.append("}");
+            }
+            HBUtils.info("ReadHanlder -> {}",sb.toString());
+        }
     }
 }

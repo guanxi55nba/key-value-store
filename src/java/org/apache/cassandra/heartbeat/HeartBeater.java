@@ -44,7 +44,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
     private static final Logger logger = LoggerFactory.getLogger(HeartBeater.class);
     private static final String MBEAN_NAME = "org.apache.cassandra.net:type=HeartBeater";
     private static final DebuggableScheduledThreadPoolExecutor executor = new DebuggableScheduledThreadPoolExecutor("HeartBeatTasks");
-    public final static int intervalInMillis = ConfReader.instance.getHeartbeatInterval();
+    public final static int intervalInMillis = ConfReader.getHeartbeatInterval();
     private final Comparator<InetAddress> inetcomparator = new Comparator<InetAddress>()
     {
         public int compare(InetAddress addr1, InetAddress addr2)
@@ -62,7 +62,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
     private ScheduledFuture<?> scheduledHeartBeatTask;
     public static final HeartBeater instance = new HeartBeater();
     private String localSrcName = HBUtils.getLocalAddress().getHostAddress();
-    private boolean enable = ConfReader.instance.heartbeatEnable();
+    private boolean enable = ConfReader.heartbeatEnable();
     
 
     private HeartBeater()

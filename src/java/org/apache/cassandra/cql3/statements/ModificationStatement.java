@@ -658,7 +658,7 @@ public abstract class ModificationStatement implements CQLStatement
             ThriftValidation.validateKey(cfm, key);
             ColumnFamily cf = ArrayBackedSortedColumns.factory.create(cfm);
             addUpdateForKey(cf, key, clusteringPrefix, params);
-            if (ConfReader.instance.heartbeatEnable())
+            if (ConfReader.heartbeatEnable())
             {
                 String ksName = cf.metadata().ksName;
                 long vn = -1;

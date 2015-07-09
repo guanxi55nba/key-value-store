@@ -214,7 +214,7 @@ public class Mutation implements IMutation
         Keyspace ks = Keyspace.open(keyspaceName);
         ks.apply(this, ks.metadata.durableWrites);
         
-        if(ConfReader.instance.heartbeatEnable()) 
+        if(ConfReader.heartbeatEnable()) 
             HeartBeater.instance.updateStatusMsgMap(keyspaceName, key, modifications.values());
     }
 

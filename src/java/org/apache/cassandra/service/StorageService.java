@@ -334,7 +334,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
 
         MessagingService.instance().registerVerbHandlers(MessagingService.Verb.SNAPSHOT, new SnapshotVerbHandler());
         MessagingService.instance().registerVerbHandlers(MessagingService.Verb.ECHO, new EchoVerbHandler());
-		if (ConfReader.instance.heartbeatEnable()) {
+		if (ConfReader.heartbeatEnable()) {
 			MessagingService.instance().registerVerbHandlers(
 					MessagingService.Verb.HEARTBEAT_DIGEST,
 					new HeartBeatVerbHandler());

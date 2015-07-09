@@ -449,55 +449,55 @@ public class HBUtils
     
     public static void info(String msg)
     {
-        if(ConfReader.instance.isLogEnabled())
+        if(ConfReader.isLogEnabled())
             logger.info(msg);
     }
 
     public static void info(String format, Object arg)
     {
-        if(ConfReader.instance.isLogEnabled())
+        if(ConfReader.isLogEnabled())
             logger.info(format, arg);
     }
 
     public static void info(String format, Object arg1, Object arg2)
     {
-        if(ConfReader.instance.isLogEnabled())
+        if(ConfReader.isLogEnabled())
             logger.info(format, arg1, arg2);
     }
 
     public static void info(String format, Object... arguments)
     {
-        if(ConfReader.instance.isLogEnabled())
+        if(ConfReader.isLogEnabled())
             logger.info(format, arguments);
     }
     
     public static void error(String msg)
     {
-        if (ConfReader.instance.isLogEnabled())
+        if(ConfReader.isLogEnabled())
             logger.error(msg);
     }
 
     public static void error(String format, Object arg)
     {
-        if (ConfReader.instance.isLogEnabled())
+        if(ConfReader.isLogEnabled())
             logger.error(format, arg);
     }
 
     public static void error(String format, Object arg1, Object arg2)
     {
-        if (ConfReader.instance.isLogEnabled())
+        if(ConfReader.isLogEnabled())
             logger.error(format, arg1, arg2);
     }
 
     public static void error(String format, Object... arguments)
     {
-        if (ConfReader.instance.isLogEnabled())
+        if(ConfReader.isLogEnabled())
             logger.error(format, arguments);
     }
 
     public static void error(String msg, Throwable t)
     {
-        if (ConfReader.instance.isLogEnabled())
+        if(ConfReader.isLogEnabled())
             logger.error(msg, t);
     }
 }

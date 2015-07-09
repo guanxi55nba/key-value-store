@@ -23,7 +23,7 @@ public class HeartBeatVerbHandler implements IVerbHandler<StatusSynMsg> {
     @Override
     public void doVerb(MessageIn<StatusSynMsg> message, int id) {
         //logger.info("message size: {}, ts: {}", message.payload.getData().size(), HBUtils.dateFormat(message.payload.getTimestamp()) );
-        if(ConfReader.instance.heartbeatEnable()) {
+        if(ConfReader.heartbeatEnable()) {
             //String srcName = DatabaseDescriptor.getEndpointSnitch().getDatacenter(from);
             String srcName = message.from.getHostAddress();
             // Update multi dc status map

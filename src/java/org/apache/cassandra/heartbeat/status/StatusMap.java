@@ -145,7 +145,7 @@ public class StatusMap
             KeyStatus keyStatus = getKeyStatus(inKSName, sourceStr);
             KeyResult keyResult = keyStatus.hasLatestValue(inKeyStr, inReadTs);
             if (!keyResult.value())
-                blockMap.put(inKeyStr, keyResult);
+                blockMap.put(sourceStr, keyResult);
         }
         
         return new ARResult(blockMap);

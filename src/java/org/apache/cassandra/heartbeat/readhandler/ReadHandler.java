@@ -1,16 +1,15 @@
 package org.apache.cassandra.heartbeat.readhandler;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.cassandra.db.Cell;
-import org.apache.cassandra.db.ColumnFamily;
-import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.RangeSliceCommand;
 import org.apache.cassandra.db.ReadCommand;
+import org.apache.cassandra.heartbeat.status.ARResult;
 import org.apache.cassandra.heartbeat.utils.HBUtils;
 import org.apache.cassandra.service.pager.Pageable;
 import org.slf4j.Logger;
@@ -33,28 +32,23 @@ public class ReadHandler
     {
         scheduleTimer();
     }
-
-    /**
-     * Check whether there is a subscription could be awake
-     * 
-     * @param inMutation
-     */
-    public void notifySubscription(Mutation inMutation)
+    
+    public static void notifyByTs(String ksName, String inSrc, String key, final long msgTs)
     {
-        // Get mutation Ts
-        String ksName = inMutation.getKeyspaceName();
-        if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName))
-        {
-            for (ColumnFamily col : inMutation.getColumnFamilies())
-            {
-                String key = HBUtils.getPrimaryKeyName(col.metadata());
-                Cell cell = col.getColumn(HBUtils.VERSION_CELLNAME);
-                notifySubscription(ksName, key, cell.timestamp());
-            }
-        }
+        instance.notifySubscriptionByTs(ksName, inSrc, key, msgTs);
     }
 
-    public void notifySubscription(String ksName, String key, final long msgTs)
+    public static void notifyByVn(String ksName, String inSrc, String key, final long msgVn)
+    {
+        instance.notifySubscriptionByVn(ksName, inSrc, key, msgVn);
+    }
+    
+    public static void sinkRead(Pageable page, byte[] lock, long ts, long version, ARResult inResult)
+    {
+        instance.sinkSubscription(page, lock, ts, version, inResult);
+    }
+
+    void notifySubscriptionByTs(String ksName, String inSrc, String key, final long msgTs)
     {
         ConcurrentHashMap<String, KeySubscriptions> keyToSubs = m_subscriptionMatrics.get(ksName);
         if (keyToSubs != null)
@@ -63,53 +57,71 @@ public class ReadHandler
             if (keySubs != null)
             {
                 // Notify subscriptions
-                keySubs.notifySubscription(msgTs);
+                keySubs.notifySubscriptionByTs(inSrc, msgTs);
             }
         }
     }
     
-    public void sinkSubscription(Pageable page, final long ts, byte[] lock, long version)
+    void notifySubscriptionByVn(String ksName, String inSrc, String key, final long vn)
+    {
+        ConcurrentHashMap<String, KeySubscriptions> keyToSubs = m_subscriptionMatrics.get(ksName);
+        if (keyToSubs != null)
+        {
+            KeySubscriptions keySubs = keyToSubs.get(key);
+            if (keySubs != null)
+            {
+                // Notify subscriptions
+                keySubs.notifySubscriptionByVn(inSrc, vn);
+            }
+        }
+    }
+    
+    void sinkSubscription(Pageable page, byte[] lock, long ts,  long version, ARResult inResult)
     {
         if (page != null)
         {
-            Subscription subscription = new Subscription(page, ts, lock, version);
             if (page instanceof ReadCommand)
             {
                 ReadCommand cmd = (ReadCommand) page;
-                addSubscriptions(cmd.ksName, HBUtils.byteBufferToString(cmd.key), ts, subscription);
+                addSubscriptions(page, lock, cmd.ksName, cmd.key, ts, inResult );
             }
             else if (page instanceof Pageable.ReadCommands)
             {
                 List<ReadCommand> readCommands = ((Pageable.ReadCommands) page).commands;
-                for (ReadCommand cmd : readCommands)
+                if (readCommands.size() == 1)
                 {
-                    addSubscriptions(cmd.ksName, HBUtils.byteBufferToString(cmd.key), ts, subscription);
+                    ReadCommand cmd = readCommands.get(0);
+                    addSubscriptions(page, lock, cmd.ksName, cmd.key, ts, inResult);
+                }
+                else
+                {
+                    logger.info("ReadHandler::sinkSubscription, pagable is one read command list whose size > 1");
                 }
             }
             
             else if (page instanceof RangeSliceCommand)
             {
-                logger.info("ReadHandler::sinkReadHandler, page is instance of RangeSliceCommand");
+                logger.info("ReadHandler::sinkSubscription, page is instance of RangeSliceCommand");
             }
             else
             {
-                logger.error("StatusMap::hasLatestValue, Unkonw pageable type");
+                logger.error("ReadHandler::sinkSubscription, Unkonw pageable type");
             }
             //logger.info("sinkReadHandler: [ Pageable: {}, Timestamp: {} ", page, HBUtils.dateFormat(inTimestamp));
         }
         else
         {
-            logger.info("ReadHandler::sinkReadHandler, page is null");
+            logger.info("ReadHandler::sinkSubscription, page is null");
         }
     }
     
-    private void addSubscriptions(String inKsName, String inKey, final long ts, Subscription inSub)
+    private void addSubscriptions(Pageable pg, byte[] lockObj, String inKsName, ByteBuffer inKey, final long ts, ARResult inResult )
     {
         KeySubscriptions keySubs = getKeySubscriptions(inKsName, inKey);
-        keySubs.addSubscription(ts, inSub);
+        keySubs.addSubscription(pg, lockObj, ts,inResult);
     }
     
-    private KeySubscriptions getKeySubscriptions(String ksName, String key)
+    private KeySubscriptions getKeySubscriptions(String ksName, ByteBuffer key)
     {
         ConcurrentHashMap<String, KeySubscriptions> keyToSubs = m_subscriptionMatrics.get(ksName);
         if (keyToSubs == null)
@@ -119,12 +131,14 @@ public class ReadHandler
             if (keyToSubs == null)
                 keyToSubs = temp1;
         }
-
+        
+        String keyStr = HBUtils.byteBufferToString(key);
+        
         KeySubscriptions subs = keyToSubs.get(key);
         if (subs == null)
         {
-            KeySubscriptions temp2 = new KeySubscriptions();
-            subs = keyToSubs.putIfAbsent(key, temp2);
+            KeySubscriptions temp2 = new KeySubscriptions(ksName, key);
+            subs = keyToSubs.putIfAbsent(keyStr, temp2);
             if (subs == null)
                 subs = temp2;
         }

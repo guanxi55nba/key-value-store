@@ -1,15 +1,19 @@
 package org.apache.cassandra.heartbeat.readhandler;
 
-import java.util.Set;
+import java.net.InetAddress;
+import java.nio.ByteBuffer;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
-import org.apache.cassandra.heartbeat.status.StatusMap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.cassandra.heartbeat.status.ARResult;
+import org.apache.cassandra.heartbeat.utils.HBUtils;
+import org.apache.cassandra.service.pager.Pageable;
 
-import com.google.common.collect.Sets;
 
 /**
+ * 
+ * Contains all the subscriptions for one key
+ * 
  *  { ts: [sub1, sub2, sub3] }
  * 
  * @author xig
@@ -17,70 +21,88 @@ import com.google.common.collect.Sets;
  */
 public class KeySubscriptions
 {
-    private static final Logger logger = LoggerFactory.getLogger(KeySubscriptions.class);
-    private ConcurrentSkipListMap<Long, Set<Subscription>> m_subMap;
-    public KeySubscriptions()
+    private ConcurrentSkipListMap<Long, Subscription> m_subMap;
+    private ConcurrentHashMap<String, Boolean> m_hasLatestValueMap;
+    private String m_ksName;
+    private ByteBuffer m_key;
+    private String m_keyStr;
+
+    public KeySubscriptions(String ksName, ByteBuffer key)
     {
-        m_subMap = new ConcurrentSkipListMap<Long, Set<Subscription>>();
+        m_subMap = new ConcurrentSkipListMap<Long, Subscription>();
+        m_hasLatestValueMap = new ConcurrentHashMap<String, Boolean>();
+        m_ksName = ksName;
+        m_key = key;
+        m_keyStr = HBUtils.byteBufferToString(m_key);
+        for (InetAddress src : HBUtils.getReplicaListExcludeLocal(m_ksName, m_key))
+            m_hasLatestValueMap.put(src.getHostAddress(), false);
     }
 
-    public void addSubscription(long inTs, Subscription inSub)
+    public void addSubscription(Pageable pg, byte[] lockObj, long inTs, ARResult inResult)
     {
-        // Get subscriptions 
-        Set<Subscription> subs = m_subMap.get(inTs);
+        // Get subscriptions
+        Subscription subs = m_subMap.get(inTs);
         if (subs == null)
         {
-            Set<Subscription> temp = Sets.newConcurrentHashSet();
+            Subscription temp = new Subscription(m_ksName, m_keyStr, inTs);
             subs = m_subMap.putIfAbsent(inTs, temp);
             if (subs == null)
                 subs = temp;
         }
-        
-        subs.add(inSub);
+
+        subs.add(lockObj, pg, inResult);
     }
     
-    public void notifySubscription(long msgTs)
+    public void notifySubscriptionByTs(String inSrc, long msgTs)
     {
         for (Long ts : m_subMap.keySet())
         {
             if (ts <= msgTs)
             {
-                Set<Subscription> subs = m_subMap.get(ts);
-                if (subs != null && !subs.isEmpty())
-                    notifySubscriptionsImpl(msgTs, subs, false);
+                Subscription subs = m_subMap.get(ts);
+                if (subs != null)
+                    subs.awakeByTs(inSrc, msgTs);
             }
             else
                 break;
         }
     }
     
-    private void notifySubscriptionsImpl(long ts, Set<Subscription> subs, boolean shouldNotify)
+    public void notifySubscriptionByVn(String inSrc, long msgVn)
     {
-        boolean notify = shouldNotify;
-        for (Subscription sub : subs)
+        for (Subscription sub : m_subMap.values())
         {
-            if (!notify)
-                notify = StatusMap.instance.hasLatestValue(sub);
-
-            if (notify)
-            {
-                synchronized (sub.getLockObject())
-                {
-                    sub.getLockObject().notify();
-                }
-                subs.remove(sub);
-                logger.error("Read subscription {} is notified", sub.m_version);
-            }
+            sub.awakeByVn(inSrc, msgVn);
         }
-        if (subs.isEmpty())
-            m_subMap.remove(ts, subs);
     }
+    
+//    private void notifySubscriptionsImpl(long ts, Set<Subscription> subs, boolean shouldNotify)
+//    {
+//        boolean notify = shouldNotify;
+//        for (Subscription sub : subs)
+//        {
+//            if (!notify)
+//                notify = StatusMap.instance.hasLatestValue(sub);
+//
+//            if (notify)
+//            {
+//                synchronized (sub.getLockObject())
+//                {
+//                    sub.getLockObject().notify();
+//                }
+//                subs.remove(sub);
+//                logger.error("Read subscription {} is notified", sub.m_version);
+//            }
+//        }
+//        if (subs.isEmpty())
+//            m_subMap.remove(ts, subs);
+//    }
     
     public int size()
     {
         int size = 0;
-        for (Set<Subscription> subs : m_subMap.values())
-            size += subs.size();
+        for (Subscription sub : m_subMap.values())
+            size += sub.size();
         return size;
     }
     

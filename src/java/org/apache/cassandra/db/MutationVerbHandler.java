@@ -65,15 +65,12 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
             
             message.payload.apply();
             
-            if (ConfReader.instance.heartbeatEnable())
+            if (ConfReader.heartbeatEnable())
             {
                 if (message.payload != null)
                 {
                     // Update status map
                     StatusMap.instance.removeEntry(message.from.getHostAddress(), message.payload);
-
-                    // Notify read subscription
-                    ReadHandler.instance.notifySubscription(message.payload);
                 }
                 else
                 {

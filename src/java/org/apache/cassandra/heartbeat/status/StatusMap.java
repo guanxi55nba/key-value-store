@@ -2,6 +2,7 @@ package org.apache.cassandra.heartbeat.status;
 
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Timer;
@@ -11,12 +12,12 @@ import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.RangeSliceCommand;
 import org.apache.cassandra.db.ReadCommand;
 import org.apache.cassandra.heartbeat.StatusSynMsg;
-import org.apache.cassandra.heartbeat.readhandler.KeySubscriptions;
-import org.apache.cassandra.heartbeat.readhandler.Subscription;
 import org.apache.cassandra.heartbeat.utils.HBUtils;
 import org.apache.cassandra.service.pager.Pageable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.collect.Maps;
 
 /**
  * Stand alone component to keep status msg related info map
@@ -32,6 +33,7 @@ public class StatusMap
     ConcurrentHashMap<String, ConcurrentHashMap<String, KeyStatus>> m_currentEntries = 
             new ConcurrentHashMap<String, ConcurrentHashMap<String, KeyStatus>>(); // keyspace, src, keystatus
     public static final StatusMap instance = new StatusMap();
+    HashMap<String, KeyResult> m_emptyBlockMap = Maps.newHashMap();
 
     private StatusMap()
     {
@@ -57,6 +59,12 @@ public class StatusMap
         }
     }
     
+    /**
+     * Called when a new mutation arrives
+     * 
+     * @param inSrcName
+     * @param inMutation
+     */
     public void removeEntry(String inSrcName, final Mutation inMutation)
     {
         if (inSrcName != null && inMutation != null)
@@ -65,13 +73,82 @@ public class StatusMap
             if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName))
             {
                 KeyStatus keyStatus = getKeyStatus(ksName, inSrcName);
-                keyStatus.updateStatus(inSrcName, ksName, inMutation.getColumnFamilies());
+                keyStatus.removeEntry(inSrcName, ksName, inMutation.getColumnFamilies());
             }
         }
         else
         {
             logger.debug("removeEntry method: inSrcName or inMutation is null");
         }
+    }
+    
+    /**
+     * @param pageable
+     * @param inTimestamp
+     * @return
+     */
+    public ARResult hasLatestValue(Pageable pageable, long inTimestamp)
+    {
+        ARResult arrResult = null;
+        if (pageable instanceof ReadCommand)
+        {
+            ReadCommand cmd = (ReadCommand) pageable;
+            arrResult = hasLatestValueImpl(cmd.ksName, cmd.key, inTimestamp);
+        }
+        else if (pageable instanceof Pageable.ReadCommands)
+        {
+            List<ReadCommand> readCommands = ((Pageable.ReadCommands) pageable).commands;
+            if (readCommands.size() == 1)
+            {
+                ReadCommand cmd = readCommands.get(0);
+                arrResult = hasLatestValueImpl(cmd.ksName, cmd.key, inTimestamp);
+            }
+            else if(readCommands.size()>1)
+            {
+                logger.error("StatusMap::hasLatestValue, Multiple read commands is not supported");
+            }
+        }
+        else if (pageable instanceof RangeSliceCommand)
+        {
+            logger.error("StatusMap::hasLatestValue, RangeSliceCommand doesn't support");
+        }
+        else
+        {
+            logger.error("StatusMap::hasLatestValue, Unkonw pageable type");
+        }
+        return arrResult == null ? new ARResult(m_emptyBlockMap) : arrResult;
+    }
+    
+    /**
+     * Used to check whether has latest value on one src
+     * 
+     * @param inKsName
+     * @param inSrc
+     * @param inKey
+     * @param inReadTs
+     * @return
+     */
+    public KeyResult hasLatestValueOnOneSrc(String inKsName, String inSrc, String inKey, long inReadTs)
+    {
+        KeyStatus keyStatus = getKeyStatus(inKsName, inSrc);
+        return keyStatus.hasLatestValue(inKey, inReadTs);
+    }
+    
+    private ARResult hasLatestValueImpl(String inKSName, ByteBuffer inKey, long inReadTs)
+    {
+        List<InetAddress> replicaList = HBUtils.getReplicaListExcludeLocal(inKSName, inKey);
+        HashMap<String, KeyResult> blockMap = Maps.newHashMap();
+        String inKeyStr = HBUtils.byteBufferToString(inKey);
+        for (InetAddress sourceName : replicaList)
+        {
+            String sourceStr = sourceName.getHostAddress();
+            KeyStatus keyStatus = getKeyStatus(inKSName, sourceStr);
+            KeyResult keyResult = keyStatus.hasLatestValue(inKeyStr, inReadTs);
+            if (!keyResult.value())
+                blockMap.put(inKeyStr, keyResult);
+        }
+        
+        return new ARResult(blockMap);
     }
     
     private KeyStatus getKeyStatus(final String ksName, final String srcName)
@@ -95,66 +172,6 @@ public class StatusMap
         }
 
         return keyStatus;
-    }
-    
-    public boolean hasLatestValue(Subscription inSubs)
-    {
-        return hasLatestValue(inSubs.getPageable(), inSubs.getTimestamp());
-    }
-
-    /**
-     * @param pageable
-     * @param inTimestamp
-     * @return
-     */
-    public boolean hasLatestValue(Pageable pageable, long inTimestamp)
-    {
-        boolean hasLatestValue = true;
-        if (pageable instanceof ReadCommand)
-        {
-            ReadCommand cmd = (ReadCommand) pageable;
-            if (!hasLatestValueImpl(cmd.ksName, cmd.key, inTimestamp))
-                hasLatestValue = false;
-        }
-        else if (pageable instanceof Pageable.ReadCommands)
-        {
-            List<ReadCommand> readCommands = ((Pageable.ReadCommands) pageable).commands;
-            for (ReadCommand cmd : readCommands)
-            {
-                if (!hasLatestValueImpl(cmd.ksName, cmd.key, inTimestamp))
-                {
-                    hasLatestValue = false;
-                    break;
-                }
-            }
-        }
-        else if (pageable instanceof RangeSliceCommand)
-        {
-            logger.error("StatusMap::hasLatestValue, RangeSliceCommand doesn't support");
-        }
-        else
-        {
-            hasLatestValue = false;
-            logger.error("StatusMap::hasLatestValue, Unkonw pageable type");
-        }
-        return hasLatestValue;
-    }
-
-    private boolean hasLatestValueImpl(String inKSName, ByteBuffer inKey, long inReadTs)
-    {
-        boolean hasLatestValue = true;
-        List<InetAddress> replicaList = HBUtils.getReplicaListExcludeLocal(inKSName, inKey);
-        String inKeyStr = HBUtils.byteBufferToString(inKey);
-        for (InetAddress sourceName : replicaList)
-        {
-            KeyStatus keyStatus = getKeyStatus(inKSName, sourceName.getHostAddress());
-            if (!keyStatus.hasLatestValue(inKeyStr, inReadTs))
-            {
-                hasLatestValue = false;
-                break;
-            }
-        }
-        return hasLatestValue;
     }
     
     private void scheduleTimer()

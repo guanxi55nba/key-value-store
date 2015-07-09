@@ -44,6 +44,7 @@ import org.apache.cassandra.db.marshal.*;
 import org.apache.cassandra.dht.*;
 import org.apache.cassandra.exceptions.*;
 import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
+import org.apache.cassandra.heartbeat.status.ARResult;
 import org.apache.cassandra.heartbeat.status.StatusMap;
 import org.apache.cassandra.heartbeat.utils.ConfReader;
 import org.apache.cassandra.heartbeat.utils.HBUtils;
@@ -210,13 +211,14 @@ public class SelectStatement implements CQLStatement
         if (parameters.isCount && pageSize <= 0)
             pageSize = DEFAULT_COUNT_PAGE_SIZE;
         
-        if (ConfReader.instance.heartbeatEnable())
+        if (ConfReader.heartbeatEnable())
         {
             Set<String> ksNames = HBUtils.getReadCommandRelatedKeySpaceNames(command);
             if(!HBUtils.SYSTEM_KEYSPACES.containsAll(ksNames))
             {
                 long version = m_version.incrementAndGet();
-                if (StatusMap.instance.hasLatestValue(command, now))
+                ARResult result = StatusMap.instance.hasLatestValue(command, now);
+                if (result.value())
                 {
                     //logger.info("Read [SelectStatement], current node has latest data");
                     HBUtils.error("Read subscription {} is notified", version);
@@ -228,7 +230,7 @@ public class SelectStatement implements CQLStatement
                     {
                         try
                         {
-                            ReadHandler.instance.sinkSubscription(command, now, lock, version);
+                            ReadHandler.sinkRead(command, lock, now, version, result);
                             lock.wait();
                             //logger.info("[WaitingThread]: Successfully notified!");
                         }

@@ -1,6 +1,15 @@
 package org.apache.cassandra.heartbeat.readhandler;
 
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.cassandra.heartbeat.status.ARResult;
+import org.apache.cassandra.heartbeat.status.KeyResult;
+import org.apache.cassandra.heartbeat.status.StatusMap;
 import org.apache.cassandra.service.pager.Pageable;
+
+import com.datastax.shaded.netty.util.internal.ConcurrentHashMap;
+import com.google.common.collect.Sets;
 
 /**
  * Read Subscription: { Pagable, readTs, lockObject }
@@ -8,55 +17,104 @@ import org.apache.cassandra.service.pager.Pageable;
  * @author XiGuan
  * 
  */
-public class Subscription implements Comparable<Subscription> {
-	Pageable m_pageable;
-	Long m_timestamp;
-	byte[] m_lockObject;
-	public final long m_version;
+public class Subscription
+{
+    public final long m_version;
+    private String m_ksName;
+    private String m_key;
+    private long m_timestamp;
+    private ConcurrentHashMap<String, KeyResult> m_statusMap; // src, key result
+    private volatile boolean m_flag = true;
+    private Set<byte[]> m_lockSet;
+    private volatile boolean m_lockIsClear;
 
-	public Subscription(Pageable inPageable, long inTimestamp, byte[] lockObject) {
-		m_pageable = inPageable;
-		m_timestamp = inTimestamp;
-		m_lockObject = lockObject;
-		m_version = -1;
-	}
-	
-    public Subscription(Pageable inPageable, long inTimestamp, byte[] lockObject, long inVersion)
+    public Subscription(String ksName, String key, long inTs)
     {
-        m_pageable = inPageable;
-        m_timestamp = inTimestamp;
-        m_lockObject = lockObject;
-        m_version = inVersion;
+        m_ksName = ksName;
+        m_key = key;
+        m_version = inTs;
+        m_statusMap = new ConcurrentHashMap<String, KeyResult>();
+        m_lockSet = Sets.newConcurrentHashSet();
     }
 
-	@Override
-	public int compareTo(Subscription inTs) {
-		return m_timestamp.compareTo(inTs.getTimestamp());
-	}
+    public void add(byte[] lockObj, Pageable pg, ARResult inResult)
+    {
+        if (!m_lockIsClear)
+        {
+            m_lockSet.add(lockObj);
+            for (Map.Entry<String, KeyResult> entry : inResult.getBlockMap().entrySet())
+            {
+                KeyResult result = m_statusMap.putIfAbsent(entry.getKey(), entry.getValue());
+                if (result != null)
+                {
+                    synchronized (result)
+                    {
+                        result.update(entry.getValue());
+                    }
+                }
+            }
+        }
+        else
+        {
+            synchronized (lockObj)
+            {
+                lockObj.notify();
+            }
+        }
+    }
 
-	public Pageable getPageable() {
-		return m_pageable;
-	}
+    public void awakeByTs(String src, long ts)
+    {
+        KeyResult keyResult = m_statusMap.get(src);
+        if (keyResult != null)
+        {
+            if (keyResult.isCausedByTs())
+            {
+                KeyResult temp = StatusMap.instance.hasLatestValueOnOneSrc(m_ksName, src, m_key, m_timestamp);
+                if (temp.value())
+                {
+                    m_statusMap.remove(ts, keyResult);
+                    m_flag = true;
+                    awakeImpl();
+                }
+                else
+                {
+                    keyResult.update(temp);
+                }
+            }
+        }
+    }
 
-	public void setPageable(Pageable inPageable) {
-		m_pageable = inPageable;
-	}
+    public void awakeByVn(String src, long vn)
+    {
+        KeyResult keyResult = m_statusMap.get(src);
+        if (keyResult != null)
+        {
+            if (keyResult.isCausedByVn() && keyResult.getExpectedVn() == vn)
+            {
+                awakeImpl();
+            }
+        }
+    }
 
-	public Long getTimestamp() {
-		return m_timestamp;
-	}
-
-	public void setTimestamp(Long inTimestamp) {
-		m_timestamp = inTimestamp;
-	}
-
-	public byte[] getLockObject() {
-		return m_lockObject;
-	}
-
-	public void setLockObject(byte[] inLockObject) {
-		m_lockObject = inLockObject;
-	}
-	
-	
+    public int size()
+    {
+        return m_lockSet.size();
+    }
+    
+    private void awakeImpl()
+    {
+        if (m_flag && m_statusMap.isEmpty() && !m_lockIsClear)
+        {
+            m_lockIsClear = true;
+            for (byte[] lock : m_lockSet)
+            {
+                synchronized (lock)
+                {
+                    lock.notify();
+                }
+            }
+            m_lockSet.clear();
+        }
+    }
 }

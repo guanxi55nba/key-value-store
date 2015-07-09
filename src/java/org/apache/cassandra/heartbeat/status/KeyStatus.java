@@ -1,6 +1,7 @@
 package org.apache.cassandra.heartbeat.status;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -46,7 +47,7 @@ public class KeyStatus
             // Notify sinked read handler
             HashMap<String, Status> copy = Maps.newHashMap(m_keyStatusMap);
             for (Map.Entry<String, Status> entry : copy.entrySet())
-                ReadHandler.instance.notifySubscription(ksName, entry.getKey(), m_updateTs);
+                ReadHandler.notifyByTs(ksName, inSrc, entry.getKey(), m_updateTs);
             
             for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : synMsgData.entrySet())
             {
@@ -55,12 +56,12 @@ public class KeyStatus
                 status.addVnTsData(entry.getValue());
 
                 // Notify sinked read handler
-                ReadHandler.instance.notifySubscription(ksName, entry.getKey(), m_updateTs);
+                ReadHandler.notifyByTs(ksName, inSrc, entry.getKey(), m_updateTs);
             }
         }
     }
     
-    public void updateStatus(final String inSrc, final String ksName, final Collection<ColumnFamily> CFS)
+    public void removeEntry(final String inSrc, final String ksName, final Collection<ColumnFamily> CFS)
     {
         if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName))
         {
@@ -71,7 +72,10 @@ public class KeyStatus
                 {
                     String key = HBUtils.getPrimaryKeyName(cf.metadata());
                     Status status = getStatus(key);
-                    status.removeEntry(version.getTimestamp(), version.getTimestamp());
+                    status.removeEntry(version.getLocalVersion(), version.getTimestamp());
+                    
+                    // Notify read subscription
+                    ReadHandler.notifyByVn(ksName, inSrc, key, version.getLocalVersion());
                 }
                 else
                 {
@@ -81,35 +85,52 @@ public class KeyStatus
         }
     }
     
-    public boolean hasLatestValue(String key, long inReadTs)
+    public KeyResult hasLatestValue(String key, long inReadTs)
     {
         boolean hasLatestValue = true;
+        boolean causedByTs = false;
+        boolean causedByVn = false;
+        long version = -1;
         Status status = m_keyStatusMap.get(key);
-        if (status == null)
+        if (status == null || m_updateTs <= inReadTs)
         {
             hasLatestValue = false;
-        }
-        else if (m_updateTs <= inReadTs)
-        {
-            hasLatestValue = false;
-            logger.info("KeyStatus::hasLatestValue, key {}, hasLatestValue == {}, status update ts [{}] <= read ts [{}]",
-                    key, hasLatestValue, HBUtils.dateFormat(m_updateTs), HBUtils.dateFormat(inReadTs));
+            causedByTs = true;
+            if (status == null)
+                logger.info("KeyStatus::hasLatestValue, Status object is null");
+            else
+                logger.info(
+                        "KeyStatus::hasLatestValue, key {}, hasLatestValue == {}, status update ts [{}] <= read ts [{}]",
+                        key, hasLatestValue, HBUtils.dateFormat(m_updateTs), HBUtils.dateFormat(inReadTs));
         }
         else
         {
             ConcurrentSkipListMap<Long, Long> versions = status.getVnToTsMap(); // vn: ts
-
-            // if doesn't exist version whose timestamp < read ts, then this node contains the latest data
+            // if doesn't exist version whose timestamp <= read ts, then this node contains the latest data
+            long previousVn = -1;
             for (Map.Entry<Long, Long> entry : versions.entrySet())
             {
-                if (entry.getKey() >= 0 && entry.getValue() <= inReadTs)
+                Long localVn = entry.getKey(), timestamp = entry.getValue();
+                if (localVn >= 0)
                 {
-                    hasLatestValue = false;
-                    break;
+                    if (timestamp <= inReadTs)
+                    {
+                        hasLatestValue = false;
+                    }
+                    else
+                    {
+                        if (!hasLatestValue && (localVn - previousVn) == 1)
+                        {
+                            version = previousVn;
+                            causedByVn = true;
+                        }
+                        break;
+                    }
+                    previousVn = entry.getKey();
                 }
             }
         }
-        return hasLatestValue;
+        return new KeyResult(hasLatestValue, causedByTs, causedByVn, version);
     }
     
     private Status getStatus(String key)

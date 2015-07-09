@@ -14,7 +14,7 @@ public class Status
     private ConcurrentSkipListMap<Long, Long> m_currentVnToTs;
     private ConcurrentSkipListMap<Long, Long> m_removedVnToTs = new ConcurrentSkipListMap<Long, Long>();
     byte[] m_lockObj = new byte[0];
-    private volatile boolean flag = false;
+    private volatile boolean flag = true;
 
     public Status()
     {
@@ -23,8 +23,7 @@ public class Status
 
     public void addVnTsData(long inVersionNo, long inTimestamp)
     {
-        boolean temp = flag;
-        if (!m_removedVnToTs.containsKey(inVersionNo))
+        if (!m_removedVnToTs.containsKey(inVersionNo)&&flag)
         {
             m_currentVnToTs.put(inVersionNo, inTimestamp);
         }
@@ -34,15 +33,14 @@ public class Status
     {
         for (Map.Entry<Long, Long> entry : inMap.entrySet())
         {
-            boolean temp = flag;
-            if (m_removedVnToTs.get(entry.getKey()) != null)
+            if (flag && m_removedVnToTs.get(entry.getKey()) != null )
             {
                 m_currentVnToTs.put(entry.getKey(), entry.getValue());
             }
         }
     }
     
-    public Long removeEntry(Long inVersion, Long inTs)
+    public long removeEntry(Long inVersion, Long inTs)
     {
         boolean removed;
         m_removedVnToTs.put(inVersion, inTs);

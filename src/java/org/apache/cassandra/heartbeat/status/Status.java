@@ -23,7 +23,7 @@ public class Status
 
     public void addVnTsData(long inVersionNo, long inTimestamp)
     {
-        if (!m_removedVnToTs.containsKey(inVersionNo)&&flag)
+        if (flag && !m_removedVnToTs.containsKey(inVersionNo))
         {
             m_currentVnToTs.put(inVersionNo, inTimestamp);
         }

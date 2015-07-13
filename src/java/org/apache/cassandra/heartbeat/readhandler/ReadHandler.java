@@ -28,9 +28,11 @@ public class ReadHandler
     public static final ReadHandler instance = new ReadHandler();
     private ConcurrentHashMap<String, ConcurrentHashMap<String, KeySubscriptions>> m_subscriptionMatrics =
             new ConcurrentHashMap<String, ConcurrentHashMap<String, KeySubscriptions>>(); // keyspace, key, KeySubscription
+    
+    private ConcurrentHashMap<Long, Long> m_trace = new ConcurrentHashMap<Long, Long>();
     private ReadHandler()
     {
-        scheduleTimer();
+        //scheduleTimer();
     }
     
     public static void notifyByTs(String ksName, String inSrc, String key, final long msgTs)
@@ -43,9 +45,9 @@ public class ReadHandler
         instance.notifySubscriptionByVn(ksName, inSrc, key, msgVn);
     }
     
-    public static void sinkRead(Pageable page, byte[] lock, long ts, long version, ARResult inResult)
+    public static void sinkRead(Pageable page, Object lock, long ts, ARResult inResult)
     {
-        instance.sinkSubscription(page, lock, ts, version, inResult);
+        instance.sinkSubscription(page, lock, ts, inResult);
     }
 
     void notifySubscriptionByTs(String ksName, String inSrc, String key, final long msgTs)
@@ -76,14 +78,14 @@ public class ReadHandler
         }
     }
     
-    void sinkSubscription(Pageable page, byte[] lock, long ts,  long version, ARResult inResult)
+    void sinkSubscription(Pageable page, Object lock, long ts, ARResult inResult)
     {
         if (page != null)
         {
             if (page instanceof ReadCommand)
             {
                 ReadCommand cmd = (ReadCommand) page;
-                addSubscriptions(page, lock, cmd.ksName, cmd.key, ts, inResult );
+                addSubscriptions(page, lock, cmd.ksName, cmd.key, ts, inResult);
             }
             else if (page instanceof Pageable.ReadCommands)
             {
@@ -95,10 +97,9 @@ public class ReadHandler
                 }
                 else
                 {
-                    logger.info("ReadHandler::sinkSubscription, pagable is one read command list whose size > 1");
+                    logger.error("ReadHandler::sinkSubscription, pagable is one read command list whose size > 1");
                 }
             }
-            
             else if (page instanceof RangeSliceCommand)
             {
                 logger.info("ReadHandler::sinkSubscription, page is instance of RangeSliceCommand");
@@ -115,13 +116,14 @@ public class ReadHandler
         }
     }
     
-    private void addSubscriptions(Pageable pg, byte[] lockObj, String inKsName, ByteBuffer inKey, final long ts, ARResult inResult )
+    private void addSubscriptions(Pageable pg, Object lockObj, String inKsName, ByteBuffer inKey, final long ts, ARResult inResult )
     {
-        KeySubscriptions keySubs = getKeySubscriptions(inKsName, inKey);
+        String keyStr = HBUtils.byteBufferToString(inKey);
+        KeySubscriptions keySubs = getKeySubscriptions(inKsName, keyStr);
         keySubs.addSubscription(pg, lockObj, ts,inResult);
     }
     
-    private KeySubscriptions getKeySubscriptions(String ksName, ByteBuffer key)
+    private KeySubscriptions getKeySubscriptions(String ksName, String key)
     {
         ConcurrentHashMap<String, KeySubscriptions> keyToSubs = m_subscriptionMatrics.get(ksName);
         if (keyToSubs == null)
@@ -132,13 +134,11 @@ public class ReadHandler
                 keyToSubs = temp1;
         }
         
-        String keyStr = HBUtils.byteBufferToString(key);
-        
         KeySubscriptions subs = keyToSubs.get(key);
         if (subs == null)
         {
             KeySubscriptions temp2 = new KeySubscriptions(ksName, key);
-            subs = keyToSubs.putIfAbsent(keyStr, temp2);
+            subs = keyToSubs.putIfAbsent(key, temp2);
             if (subs == null)
                 subs = temp2;
         }
@@ -155,33 +155,38 @@ public class ReadHandler
             {
                 showSubscriptionMatrics();
             }
-        }, 10000, 5000);
+        }, 1000, 3000);
     }
     
     private void showSubscriptionMatrics()
     {
-        for (Map.Entry<String, ConcurrentHashMap<String, KeySubscriptions>> entry : m_subscriptionMatrics.entrySet())
+        StringBuilder sb = new StringBuilder();
+        boolean isEmpty = m_subscriptionMatrics.isEmpty();
+        sb.append("{");
+        if (!m_subscriptionMatrics.isEmpty())
         {
-            StringBuilder sb = new StringBuilder();
-            sb.append(entry.getKey());
-            sb.append(": { ");
-            if (entry.getValue().size() > 0)
+            for (Map.Entry<String, ConcurrentHashMap<String, KeySubscriptions>> entry : m_subscriptionMatrics.entrySet())
             {
-                for (Map.Entry<String, KeySubscriptions> subEntry : entry.getValue().entrySet())
-                {
-                    sb.append(subEntry.getKey());
-                    sb.append(": ");
-                    sb.append(subEntry.getValue().size());
-                    sb.append(", ");
-                }
-                sb.setCharAt(sb.length() - 2, ' ');
-                sb.setCharAt(sb.length() - 1, '}');
+                sb.append(entry.getKey());
+                sb.append(": [ ");
+                for (KeySubscriptions subs : entry.getValue().values())
+                    sb.append(subs);
+                sb.append("]");
+                sb.append(", ");
             }
-            else
-            {
-                sb.append("}");
-            }
-            HBUtils.info("ReadHanlder -> {}",sb.toString());
+            sb.setCharAt(sb.length() - 2, ' ');
+            sb.setCharAt(sb.length() - 1, '}');
         }
+        else
+        {
+            sb.append("}");
+        }
+        if (!isEmpty)
+            HBUtils.info("ReadHanlder -> {}", sb.toString());
+    }
+    
+    public void removeVersionToTs(long vn, long ts)
+    {
+        m_trace.remove(vn, ts);
     }
 }

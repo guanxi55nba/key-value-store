@@ -1,5 +1,7 @@
 package org.apache.cassandra.heartbeat.status;
 
+import org.apache.cassandra.heartbeat.utils.HBUtils;
+
 /**
  * Bean object to present whether one key has latest value on one replica node
  * 
@@ -8,10 +10,11 @@ package org.apache.cassandra.heartbeat.status;
  */
 public class KeyResult
 {
-    boolean m_hasLatestValue;
-    boolean m_causedByTs;
-    boolean m_causedByVn;
+    volatile boolean m_hasLatestValue;
+    volatile boolean m_causedByTs;
+    volatile boolean m_causedByVn;
     long m_expectedVn = -1;
+    Object m_lock = new Object();
 
     public KeyResult(boolean hasLatestValue, boolean causedByTs, boolean causedByVn, long expectedVn)
     {
@@ -20,19 +23,31 @@ public class KeyResult
         {
             this.m_causedByTs = causedByTs;
             this.m_causedByVn = causedByVn;
-            m_expectedVn = expectedVn;
+            if (m_causedByTs)
+                m_expectedVn = expectedVn;
         }
     }
     
     public void update(KeyResult inResult)
     {
-        this.m_hasLatestValue = inResult.value();
         if (!m_hasLatestValue)
         {
-            this.m_causedByTs = inResult.isCausedByTs();
-            this.m_causedByVn = inResult.isCausedByVn();
-            m_expectedVn = inResult.getExpectedVn();
+            synchronized (m_lock)
+            {
+                this.m_hasLatestValue = inResult.value();
+                this.m_causedByTs = inResult.isCausedByTs();
+                this.m_causedByVn = inResult.isCausedByVn();
+                if (m_causedByTs)
+                    m_expectedVn = inResult.getExpectedVn();
+            }
+            checkValid();
         }
+    }
+    
+    private void checkValid()
+    {
+        if ((m_causedByTs && m_causedByVn) || (m_hasLatestValue && (m_causedByTs || m_causedByVn)))
+            HBUtils.error("============================ Error In KeyResult ============================");
     }
 
     public boolean value()
@@ -55,7 +70,6 @@ public class KeyResult
         return m_expectedVn;
     }
     
-    
     public void setValue(boolean inValue)
     {
         m_hasLatestValue = inValue;
@@ -76,6 +90,24 @@ public class KeyResult
         m_expectedVn = expectedVn;
     }
     
-    
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        if (m_hasLatestValue)
+        {
+            sb.append("has latest value");
+        }
+        else if (m_causedByTs)
+        {
+            sb.append("waiting for syn msg ");
+        }
+        else if (m_causedByVn)
+        {
+            sb.append("waiting for vn ");
+            sb.append(m_expectedVn);
+        }
+        return sb.toString();
+    }
 
 }

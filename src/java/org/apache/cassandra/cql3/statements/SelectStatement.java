@@ -71,7 +71,7 @@ public class SelectStatement implements CQLStatement
     private static AtomicLong m_version = new AtomicLong();
     private static final Logger logger = LoggerFactory.getLogger(SelectStatement.class);
     private static final int DEFAULT_COUNT_PAGE_SIZE = 10000;
-    private byte[] lock = new byte[0];
+    private Object lock = new Object();
 
     /**
      * In the current version a query containing duplicate values in an IN restriction on the partition key will
@@ -216,23 +216,18 @@ public class SelectStatement implements CQLStatement
             Set<String> ksNames = HBUtils.getReadCommandRelatedKeySpaceNames(command);
             if(!HBUtils.SYSTEM_KEYSPACES.containsAll(ksNames))
             {
-                long version = m_version.incrementAndGet();
+                //long version = m_version.incrementAndGet();
                 ARResult result = StatusMap.instance.hasLatestValue(command, now);
-                if (result.value())
-                {
-                    //logger.info("Read [SelectStatement], current node has latest data");
-                    HBUtils.error("Read subscription {} is notified", version);
-                }
-                else
+                if (!result.value())
                 {
                     // sink subscription
                     synchronized (lock)
                     {
                         try
                         {
-                            ReadHandler.sinkRead(command, lock, now, version, result);
+                            //ReadHandler.sinkRead(command, lock, now, version, result);
+                            ReadHandler.sinkRead(command, lock, now, result);
                             lock.wait();
-                            //logger.info("[WaitingThread]: Successfully notified!");
                         }
                         catch (Exception e)
                         {

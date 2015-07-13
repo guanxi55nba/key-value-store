@@ -37,7 +37,7 @@ public class StatusMap
 
     private StatusMap()
     {
-        scheduleTimer();
+        //scheduleTimer();
     }
     
     /**
@@ -84,16 +84,18 @@ public class StatusMap
     
     /**
      * @param pageable
-     * @param inTimestamp
+     * @param readTs
      * @return
      */
-    public ARResult hasLatestValue(Pageable pageable, long inTimestamp)
+    public ARResult hasLatestValue(Pageable pageable, long readTs)
     {
         ARResult arrResult = null;
         if (pageable instanceof ReadCommand)
         {
             ReadCommand cmd = (ReadCommand) pageable;
-            arrResult = hasLatestValueImpl(cmd.ksName, cmd.key, inTimestamp);
+            arrResult = hasLatestValueImpl(cmd.ksName, cmd.key, readTs);
+            if (!arrResult.value())
+                HBUtils.info(" [Read {} @ '{}'], doesn't have lstest data, since -> {} ", arrResult.m_key, HBUtils.dateFormat(readTs), arrResult);
         }
         else if (pageable instanceof Pageable.ReadCommands)
         {
@@ -101,7 +103,9 @@ public class StatusMap
             if (readCommands.size() == 1)
             {
                 ReadCommand cmd = readCommands.get(0);
-                arrResult = hasLatestValueImpl(cmd.ksName, cmd.key, inTimestamp);
+                arrResult = hasLatestValueImpl(cmd.ksName, cmd.key, readTs);
+                if (!arrResult.value())
+                    HBUtils.info(" [Read {} @ '{}'], doesn't have lstest data, since -> {} ", arrResult.m_key, HBUtils.dateFormat(readTs), arrResult);
             }
             else if(readCommands.size()>1)
             {
@@ -116,7 +120,7 @@ public class StatusMap
         {
             logger.error("StatusMap::hasLatestValue, Unkonw pageable type");
         }
-        return arrResult == null ? new ARResult(m_emptyBlockMap) : arrResult;
+        return arrResult == null ? new ARResult("", m_emptyBlockMap) : arrResult;
     }
     
     /**
@@ -148,7 +152,7 @@ public class StatusMap
                 blockMap.put(sourceStr, keyResult);
         }
         
-        return new ARResult(blockMap);
+        return new ARResult(inKeyStr, blockMap);
     }
     
     private KeyStatus getKeyStatus(final String ksName, final String srcName)
@@ -192,6 +196,7 @@ public class StatusMap
         StringBuilder sb = new StringBuilder();
         if (m_currentEntries.size() > 0)
         {
+            sb.append("{ ");
             for (Map.Entry<String, ConcurrentHashMap<String, KeyStatus>> entry : m_currentEntries.entrySet())
             {
                 sb.append(" [ ");
@@ -217,6 +222,7 @@ public class StatusMap
                 sb.append("],");
             }
             sb.setCharAt(sb.length() - 1, ' ');
+            sb.append("}");
         }
         HBUtils.info("StatusMap -> ({} ) ", sb.toString());
     }

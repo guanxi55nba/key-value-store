@@ -1,8 +1,6 @@
 package org.apache.cassandra.heartbeat.readhandler;
 
-import java.net.InetAddress;
-import java.nio.ByteBuffer;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 import org.apache.cassandra.heartbeat.status.ARResult;
@@ -22,32 +20,27 @@ import org.apache.cassandra.service.pager.Pageable;
 public class KeySubscriptions
 {
     private ConcurrentSkipListMap<Long, Subscription> m_subMap;
-    private ConcurrentHashMap<String, Boolean> m_hasLatestValueMap;
     private String m_ksName;
-    private ByteBuffer m_key;
     private String m_keyStr;
 
-    public KeySubscriptions(String ksName, ByteBuffer key)
+    public KeySubscriptions(String ksName, String keyStr)
     {
         m_subMap = new ConcurrentSkipListMap<Long, Subscription>();
-        m_hasLatestValueMap = new ConcurrentHashMap<String, Boolean>();
         m_ksName = ksName;
-        m_key = key;
-        m_keyStr = HBUtils.byteBufferToString(m_key);
-        for (InetAddress src : HBUtils.getReplicaListExcludeLocal(m_ksName, m_key))
-            m_hasLatestValueMap.put(src.getHostAddress(), false);
+        m_keyStr = keyStr;
     }
 
-    public void addSubscription(Pageable pg, byte[] lockObj, long inTs, ARResult inResult)
+    public void addSubscription(Pageable pg, Object lockObj, long inTs, ARResult inResult)
     {
-        // Get subscriptions
         Subscription subs = m_subMap.get(inTs);
         if (subs == null)
         {
             Subscription temp = new Subscription(m_ksName, m_keyStr, inTs);
             subs = m_subMap.putIfAbsent(inTs, temp);
             if (subs == null)
+            {
                 subs = temp;
+            }
         }
 
         subs.add(lockObj, pg, inResult);
@@ -55,13 +48,15 @@ public class KeySubscriptions
     
     public void notifySubscriptionByTs(String inSrc, long msgTs)
     {
-        for (Long ts : m_subMap.keySet())
+        for (Map.Entry<Long, Subscription> entry : m_subMap.entrySet())
         {
+            Long ts = entry.getKey();
             if (ts <= msgTs)
             {
-                Subscription subs = m_subMap.get(ts);
-                if (subs != null)
-                    subs.awakeByTs(inSrc, msgTs);
+                Subscription sub = entry.getValue();
+                sub.awakeByTs(inSrc, msgTs);
+                if (sub.isEmpty())
+                    m_subMap.remove(ts, sub);
             }
             else
                 break;
@@ -70,33 +65,17 @@ public class KeySubscriptions
     
     public void notifySubscriptionByVn(String inSrc, long msgVn)
     {
-        for (Subscription sub : m_subMap.values())
+        for (Map.Entry<Long, Subscription> entry : m_subMap.entrySet())
         {
+            Long ts = entry.getKey();
+            Subscription sub = entry.getValue();
             sub.awakeByVn(inSrc, msgVn);
+            if (sub.isEmpty())
+                m_subMap.remove(ts, sub);
         }
+        
     }
     
-//    private void notifySubscriptionsImpl(long ts, Set<Subscription> subs, boolean shouldNotify)
-//    {
-//        boolean notify = shouldNotify;
-//        for (Subscription sub : subs)
-//        {
-//            if (!notify)
-//                notify = StatusMap.instance.hasLatestValue(sub);
-//
-//            if (notify)
-//            {
-//                synchronized (sub.getLockObject())
-//                {
-//                    sub.getLockObject().notify();
-//                }
-//                subs.remove(sub);
-//                logger.error("Read subscription {} is notified", sub.m_version);
-//            }
-//        }
-//        if (subs.isEmpty())
-//            m_subMap.remove(ts, subs);
-//    }
     
     public int size()
     {
@@ -104,6 +83,34 @@ public class KeySubscriptions
         for (Subscription sub : m_subMap.values())
             size += sub.size();
         return size;
+    }
+    
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{ ");
+        sb.append( m_keyStr);
+        sb.append(" subs: {");
+        if (!m_subMap.isEmpty())
+        {
+            for (Map.Entry<Long, Subscription> entry : m_subMap.entrySet())
+            {
+                sb.append("'");
+                sb.append(HBUtils.dateFormat(entry.getKey()));
+                sb.append("'");
+                sb.append(": ");
+                sb.append(entry.getValue());
+                sb.append(", ");
+            }
+            sb.setCharAt(sb.length() - 2, ' ');
+            sb.setCharAt(sb.length() - 1, '}');
+        }
+        else
+        {
+            sb.append("}");
+        }
+        sb.append(" }");
+        return sb.toString();
     }
     
 }

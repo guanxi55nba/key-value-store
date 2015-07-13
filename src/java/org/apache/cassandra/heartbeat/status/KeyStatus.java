@@ -1,7 +1,6 @@
 package org.apache.cassandra.heartbeat.status;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -96,12 +95,6 @@ public class KeyStatus
         {
             hasLatestValue = false;
             causedByTs = true;
-            if (status == null)
-                logger.info("KeyStatus::hasLatestValue, Status object is null");
-            else
-                logger.info(
-                        "KeyStatus::hasLatestValue, key {}, hasLatestValue == {}, status update ts [{}] <= read ts [{}]",
-                        key, hasLatestValue, HBUtils.dateFormat(m_updateTs), HBUtils.dateFormat(inReadTs));
         }
         else
         {

@@ -3,8 +3,6 @@ package org.apache.cassandra.heartbeat.utils;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -43,13 +41,17 @@ import org.apache.commons.lang3.time.DateFormatUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.Lists;
+
 public class HBUtils
 {
 	private static final String DATE_FORMAT = "yyyy-MM-dd HH:mm:ss SSS"; 
 	private static final Logger logger = LoggerFactory.getLogger(HBUtils.class);
 	public static CellName VERSION_CELLNAME = HBUtils.cellname(HBConsts.VERSON_NO);
 	public static CellName SOURCE_CELLNAME = HBUtils.cellname(HBConsts.SOURCE);
-	public static final List<String> SYSTEM_KEYSPACES = new ArrayList<String>(Arrays.asList("system", "system_traces"));;
+	public static ByteBuffer vnColName = ByteBufferUtil.bytes(HBConsts.VERSON_NO);
+	public static ByteBuffer srcColName = ByteBufferUtil.bytes(HBConsts.SOURCE);
+	public static final List<String> SYSTEM_KEYSPACES = Lists.newArrayList("system", "system_traces");;
 	private static InetAddress localInetAddress;
 	
 	/**
@@ -319,28 +321,17 @@ public class HBUtils
     public static void addVnAndSourceInUpdate(UpdateParameters params, Composite clusteringPrefix, ColumnFamily cf,
             long vn, String srcName) throws InvalidRequestException
     {
-        String ksName = cf.metadata().ksName;
-        if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName))
+        if (!HBUtils.SYSTEM_KEYSPACES.contains(cf.metadata().ksName))
         {
             // Add version no
-            ByteBuffer vnColName = ByteBufferUtil.bytes(HBConsts.VERSON_NO);
             ColumnDefinition vnColDef = cf.metadata().getColumnDefinition(vnColName);
             CellName vnCellName = cf.getComparator().create(clusteringPrefix, vnColDef);
-            if (cf.getColumn(vnCellName) == null)
-            {
-                ByteBuffer vnCellValue = ByteBufferUtil.bytes(vn);
-                cf.addColumn(vnCellName, vnCellValue, params.timestamp);
-            }
+            cf.addColumn(vnCellName, ByteBufferUtil.bytes(vn), params.timestamp);
 
             // Add local src
-            ByteBuffer srcColName = ByteBufferUtil.bytes(HBConsts.SOURCE);
-            ColumnDefinition dcColDef = cf.metadata().getColumnDefinition(srcColName);
-            CellName srcCell = cf.getComparator().create(clusteringPrefix, dcColDef);
-            if (cf.getColumn(srcCell) == null)
-            {
-                ByteBuffer dcCellValue = ByteBufferUtil.bytes(srcName);
-                cf.addColumn(srcCell, dcCellValue, params.timestamp);
-            }
+            ColumnDefinition srcColDef = cf.metadata().getColumnDefinition(srcColName);
+            CellName srcCell = cf.getComparator().create(clusteringPrefix, srcColDef);
+            cf.addColumn(srcCell, ByteBufferUtil.bytes(srcName), params.timestamp);
         }
     }
 	

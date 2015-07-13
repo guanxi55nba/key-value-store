@@ -1,6 +1,7 @@
 package org.apache.cassandra.heartbeat.status;
 
 import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Present the result on all replica nodes
@@ -10,11 +11,13 @@ import java.util.HashMap;
  */
 public class ARResult
 {
+    String m_key;
     boolean m_hasLatestValue;
     HashMap<String, KeyResult> m_blockMap;
 
-    public ARResult(HashMap<String, KeyResult> blockMap)
+    public ARResult(String inKey, HashMap<String, KeyResult> blockMap)
     {
+        m_key = inKey;
         m_blockMap = blockMap;
         m_hasLatestValue = m_blockMap.isEmpty();
     }
@@ -27,5 +30,38 @@ public class ARResult
     public HashMap<String, KeyResult> getBlockMap()
     {
         return m_blockMap;
+    }
+    
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        if (m_hasLatestValue)
+        {
+            sb.append("has latest value for this read");
+        }
+        else
+        {
+            boolean temp1 = false;
+            sb.append("{ ");
+            for (Map.Entry<String, KeyResult> entry : m_blockMap.entrySet())
+            {
+                temp1 = true;
+                sb.append(entry.getKey());
+                sb.append(": ");
+                sb.append(entry.getValue());
+                sb.append(", ");
+            }
+            if (temp1)
+            {
+                sb.setCharAt(sb.length() - 2, ' ');
+                sb.setCharAt(sb.length() - 1, '}');
+            }
+            else
+            {
+                sb.append("}");
+            }
+        }
+        return sb.toString();
     }
 }

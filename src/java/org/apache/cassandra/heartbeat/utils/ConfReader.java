@@ -28,7 +28,7 @@ public class ConfReader
         {
             configuration.load(new FileInputStream(new File(confStr)));
             heartbeatEnable = Boolean.valueOf(configuration.getProperty("heartbeat.enable"));
-            logEnabled = Boolean.valueOf(configuration.getProperty("log.enable"));
+            logEnabled = Boolean.valueOf(configuration.getProperty("log.enable")) && heartbeatEnable;
             heartbeatInternval = Integer.valueOf(configuration.getProperty("heartbeat.interval"));
             quorumEnabled = Boolean.valueOf(configuration.getProperty("enable.write-read-local-quorum"));
         }

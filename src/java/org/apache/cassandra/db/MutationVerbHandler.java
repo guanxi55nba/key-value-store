@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
 import org.apache.cassandra.heartbeat.status.StatusMap;
 import org.apache.cassandra.heartbeat.utils.ConfReader;
 import org.apache.cassandra.heartbeat.utils.HBUtils;
@@ -46,7 +45,7 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
         try
         {
 			if (!HBUtils.SYSTEM_KEYSPACES.contains(message.payload.getKeyspaceName())) {
-				logger.info("mutation number {}", m_counter.incrementAndGet());
+				HBUtils.info("mutation number {}", m_counter.incrementAndGet());
 			}
             // Check if there were any forwarding headers in this message
             byte[] from = message.parameters.get(Mutation.FORWARD_FROM);

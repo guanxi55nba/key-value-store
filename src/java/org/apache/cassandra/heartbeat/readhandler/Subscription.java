@@ -93,7 +93,7 @@ public class Subscription
     {
         if (!m_lockIsClear)
         {
-            HBUtils.info(" [Read {} @ '{}'] is notified by ", m_key, HBUtils.dateFormat(m_timestamp), byTs ? "ts": "vn");
+            HBUtils.info(" [Read {} @ '{}'] is notified by {}", m_key, HBUtils.dateFormat(m_timestamp), byTs ? "ts": "vn");
             m_statusMap.remove(inSrc, result);
             if (m_statusMap.isEmpty())
             {

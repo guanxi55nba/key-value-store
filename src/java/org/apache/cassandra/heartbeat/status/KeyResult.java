@@ -30,7 +30,7 @@ public class KeyResult
     
     public void update(KeyResult inResult)
     {
-        if (!m_hasLatestValue)
+        if (!m_hasLatestValue && !equals(inResult))
         {
             synchronized (m_lock)
             {
@@ -108,6 +108,27 @@ public class KeyResult
             sb.append(m_expectedVn);
         }
         return sb.toString();
+    }
+    
+    private boolean equals(KeyResult obj)
+    {
+        return (m_hasLatestValue == obj.m_hasLatestValue) && (m_causedByTs == obj.m_causedByTs)
+                && (m_causedByVn == obj.m_causedByVn) && (m_expectedVn == obj.m_expectedVn);
+    }
+    
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof KeyResult)
+        {
+            KeyResult k = (KeyResult) obj;
+            return (m_hasLatestValue == k.m_hasLatestValue) && (m_causedByTs == k.m_causedByTs)
+                    && (m_causedByVn == k.m_causedByVn) && (m_expectedVn == k.m_expectedVn);
+        }
+        else
+        {
+            return false;
+        }
     }
 
 }

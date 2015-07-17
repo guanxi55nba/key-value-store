@@ -29,10 +29,10 @@ import org.apache.cassandra.exceptions.RequestExecutionException;
 import org.apache.cassandra.heartbeat.KeyMetaData;
 import org.apache.cassandra.heartbeat.extra.HBConsts;
 import org.apache.cassandra.heartbeat.extra.Version;
+import org.apache.cassandra.heartbeat.readhandler.ReadBean;
 import org.apache.cassandra.locator.AbstractReplicationStrategy;
 import org.apache.cassandra.locator.NetworkTopologyStrategy;
 import org.apache.cassandra.locator.SimpleStrategy;
-import org.apache.cassandra.service.IReadCommand;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.service.pager.Pageable;
 import org.apache.cassandra.service.pager.Pageable.ReadCommands;
@@ -273,19 +273,29 @@ public class HBUtils
         return value;
     }
 
-	public static Set<String> getReadCommandRelatedKeySpaceNames(Pageable inPageable) {
-        Set<String> ksNames = new HashSet<String>();
-        if (inPageable instanceof IReadCommand)
+    public static ReadBean getReadCommandRelatedKeySpaceName(Pageable inPageable)
+    {
+        if (inPageable instanceof ReadCommand)
         {
-            ksNames.add(((IReadCommand) inPageable).getKeyspace());
+            ReadCommand readCommand = (ReadCommand) inPageable;
+            return new ReadBean(readCommand.ksName, readCommand.key);
         }
         else if (inPageable instanceof ReadCommands)
         {
-            for (ReadCommand cmd : ((ReadCommands) inPageable).commands)
-                ksNames.add(cmd.getKeyspace());
+            List<ReadCommand> readCommands = ((Pageable.ReadCommands) inPageable).commands;
+            if (readCommands.size() == 1)
+            {
+                ReadCommand readCommand = readCommands.get(0);
+                return new ReadBean(readCommand.ksName, readCommand.key);
+            }
+            else
+            {
+                logger.error("ReadHandler::getReadCommandRelatedKeySpaceNames, pagable is one read command list whose size > 1");
+                return null;
+            }
         }
-        return ksNames;
-	}
+        return null;
+    }
 
     public static CellName cellname(String... strs)
     {
@@ -340,6 +350,11 @@ public class HBUtils
 		return getReplicaList(inKeySpaceName, key, false).contains(getLocalAddress());
 	}
 	
+    public static boolean isReplicaNode(ReadBean inBean)
+    {
+        return getReplicaList(inBean.ksName, inBean.key, false).contains(getLocalAddress());
+    }
+	
 	
     public static InetAddress getLocalAddress()
     {
@@ -353,6 +368,11 @@ public class HBUtils
                 throw new RuntimeException(e);
             }
         return localInetAddress;
+    }
+    
+    public static boolean isValidKsName(String inKsName)
+    {
+        return SYSTEM_KEYSPACES.contains(inKsName);
     }
     
     /*public static String byteBufferToString(String inKSName, String inCFName, ByteBuffer inKey)

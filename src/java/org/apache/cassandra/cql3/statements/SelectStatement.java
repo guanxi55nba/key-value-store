@@ -43,6 +43,7 @@ import org.apache.cassandra.db.index.SecondaryIndexManager;
 import org.apache.cassandra.db.marshal.*;
 import org.apache.cassandra.dht.*;
 import org.apache.cassandra.exceptions.*;
+import org.apache.cassandra.heartbeat.readhandler.ReadBean;
 import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
 import org.apache.cassandra.heartbeat.status.ARResult;
 import org.apache.cassandra.heartbeat.status.StatusMap;
@@ -213,10 +214,10 @@ public class SelectStatement implements CQLStatement
         
         if (ConfReader.heartbeatEnable())
         {
-            Set<String> ksNames = HBUtils.getReadCommandRelatedKeySpaceNames(command);
-            if(!HBUtils.SYSTEM_KEYSPACES.containsAll(ksNames))
+            ReadBean readBean = HBUtils.getReadCommandRelatedKeySpaceName(command);
+            if (readBean != null && !HBUtils.isValidKsName(readBean.ksName) && HBUtils.isReplicaNode(readBean))
             {
-                //long version = m_version.incrementAndGet();
+                // long version = m_version.incrementAndGet();
                 ARResult result = StatusMap.instance.hasLatestValue(command, now);
                 if (!result.value())
                 {
@@ -225,7 +226,7 @@ public class SelectStatement implements CQLStatement
                     {
                         try
                         {
-                            //ReadHandler.sinkRead(command, lock, now, version, result);
+                            // ReadHandler.sinkRead(command, lock, now, version, result);
                             ReadHandler.sinkRead(command, lock, now, result);
                             lock.wait();
                         }

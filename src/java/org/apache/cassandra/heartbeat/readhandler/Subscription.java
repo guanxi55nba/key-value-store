@@ -8,7 +8,6 @@ import org.apache.cassandra.heartbeat.status.ARResult;
 import org.apache.cassandra.heartbeat.status.KeyResult;
 import org.apache.cassandra.heartbeat.status.StatusMap;
 import org.apache.cassandra.heartbeat.utils.HBUtils;
-import org.apache.cassandra.service.pager.Pageable;
 
 /**
  * Read Subscription: { Pagable, readTs, lockObject }
@@ -33,7 +32,7 @@ public class Subscription
         m_lockMap = new ConcurrentHashMap<Integer, Object>();
     }
 
-    public void add(Object lockObj, Pageable pg, ARResult inResult)
+    public void add(Object lockObj, ARResult inResult)
     {
         if (!m_lockIsClear)
         {

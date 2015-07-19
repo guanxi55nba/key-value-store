@@ -43,7 +43,6 @@ import org.apache.cassandra.db.index.SecondaryIndexManager;
 import org.apache.cassandra.db.marshal.*;
 import org.apache.cassandra.dht.*;
 import org.apache.cassandra.exceptions.*;
-import org.apache.cassandra.heartbeat.readhandler.ReadBean;
 import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
 import org.apache.cassandra.heartbeat.status.ARResult;
 import org.apache.cassandra.heartbeat.status.StatusMap;
@@ -212,13 +211,13 @@ public class SelectStatement implements CQLStatement
         if (parameters.isCount && pageSize <= 0)
             pageSize = DEFAULT_COUNT_PAGE_SIZE;
         
-        if (ConfReader.heartbeatEnable())
+        if (ConfReader.heartbeatEnable() )
         {
-            ReadBean readBean = HBUtils.getReadCommandRelatedKeySpaceName(command);
-            if (readBean != null && !HBUtils.isValidKsName(readBean.ksName) && HBUtils.isReplicaNode(readBean))
+            ReadCommand readCmd = HBUtils.getReadCommand(command);
+            if (HBUtils.isValidRead(readCmd))
             {
                 // long version = m_version.incrementAndGet();
-                ARResult result = StatusMap.instance.hasLatestValue(command, now);
+                ARResult result = StatusMap.instance.hasLatestValue(readCmd);
                 if (!result.value())
                 {
                     // sink subscription
@@ -227,7 +226,7 @@ public class SelectStatement implements CQLStatement
                         try
                         {
                             // ReadHandler.sinkRead(command, lock, now, version, result);
-                            ReadHandler.sinkRead(command, lock, now, result);
+                            ReadHandler.sinkRead(readCmd, lock, result);
                             lock.wait();
                         }
                         catch (Exception e)

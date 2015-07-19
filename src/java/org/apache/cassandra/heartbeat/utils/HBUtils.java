@@ -20,6 +20,7 @@ import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.ConsistencyLevel;
 import org.apache.cassandra.db.Keyspace;
+import org.apache.cassandra.db.RangeSliceCommand;
 import org.apache.cassandra.db.ReadCommand;
 import org.apache.cassandra.db.composites.CellName;
 import org.apache.cassandra.db.composites.CellNames;
@@ -29,7 +30,6 @@ import org.apache.cassandra.exceptions.RequestExecutionException;
 import org.apache.cassandra.heartbeat.KeyMetaData;
 import org.apache.cassandra.heartbeat.extra.HBConsts;
 import org.apache.cassandra.heartbeat.extra.Version;
-import org.apache.cassandra.heartbeat.readhandler.ReadBean;
 import org.apache.cassandra.locator.AbstractReplicationStrategy;
 import org.apache.cassandra.locator.NetworkTopologyStrategy;
 import org.apache.cassandra.locator.SimpleStrategy;
@@ -273,28 +273,30 @@ public class HBUtils
         return value;
     }
 
-    public static ReadBean getReadCommandRelatedKeySpaceName(Pageable inPageable)
+    public static ReadCommand getReadCommand(Pageable inPagable)
     {
-        if (inPageable instanceof ReadCommand)
+        ReadCommand readCommand = null;
+        if (inPagable instanceof ReadCommand)
         {
-            ReadCommand readCommand = (ReadCommand) inPageable;
-            return new ReadBean(readCommand.ksName, readCommand.key);
+            readCommand = (ReadCommand) inPagable;
         }
-        else if (inPageable instanceof ReadCommands)
+        else if (inPagable instanceof ReadCommands)
         {
-            List<ReadCommand> readCommands = ((Pageable.ReadCommands) inPageable).commands;
+            List<ReadCommand> readCommands = ((Pageable.ReadCommands) inPagable).commands;
             if (readCommands.size() == 1)
-            {
-                ReadCommand readCommand = readCommands.get(0);
-                return new ReadBean(readCommand.ksName, readCommand.key);
-            }
+                readCommand = readCommands.get(0);
             else
-            {
-                logger.error("ReadHandler::getReadCommandRelatedKeySpaceNames, pagable is one read command list whose size > 1");
-                return null;
-            }
+                logger.error("HBUtils: getReadCommand, Pageable contains more than one read command, which is not supported");
         }
-        return null;
+        else if (inPagable instanceof RangeSliceCommand)
+        {
+            logger.error("HBUtils: getReadCommand, RangeSliceCommand doesn't support");
+        }
+        else
+        {
+            logger.error("HBUtils: getReadCommand, Unkonw pageable type");
+        }
+        return readCommand;
     }
 
     public static CellName cellname(String... strs)
@@ -350,9 +352,10 @@ public class HBUtils
 		return getReplicaList(inKeySpaceName, key, false).contains(getLocalAddress());
 	}
 	
-    public static boolean isReplicaNode(ReadBean inBean)
+    public static boolean isValidRead(ReadCommand cmd)
     {
-        return getReplicaList(inBean.ksName, inBean.key, false).contains(getLocalAddress());
+        return cmd != null && isValidKsName(cmd.ksName)
+                && getReplicaList(cmd.ksName, cmd.key, false).contains(getLocalAddress());
     }
 	
 	
@@ -372,7 +375,7 @@ public class HBUtils
     
     public static boolean isValidKsName(String inKsName)
     {
-        return SYSTEM_KEYSPACES.contains(inKsName);
+        return !SYSTEM_KEYSPACES.contains(inKsName);
     }
     
     /*public static String byteBufferToString(String inKSName, String inCFName, ByteBuffer inKey)

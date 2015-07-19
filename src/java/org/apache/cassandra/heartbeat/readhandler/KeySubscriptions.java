@@ -5,7 +5,6 @@ import java.util.concurrent.ConcurrentSkipListMap;
 
 import org.apache.cassandra.heartbeat.status.ARResult;
 import org.apache.cassandra.heartbeat.utils.HBUtils;
-import org.apache.cassandra.service.pager.Pageable;
 
 
 /**
@@ -30,20 +29,20 @@ public class KeySubscriptions
         m_keyStr = keyStr;
     }
 
-    public void addSubscription(Pageable pg, Object lockObj, long inTs, ARResult inResult)
+    public void addSubscription(long readTs, Object lockObj, ARResult inResult)
     {
-        Subscription subs = m_subMap.get(inTs);
+        Subscription subs = m_subMap.get(readTs);
         if (subs == null)
         {
-            Subscription temp = new Subscription(m_ksName, m_keyStr, inTs);
-            subs = m_subMap.putIfAbsent(inTs, temp);
+            Subscription temp = new Subscription(m_ksName, m_keyStr, readTs);
+            subs = m_subMap.putIfAbsent(readTs, temp);
             if (subs == null)
             {
                 subs = temp;
             }
         }
 
-        subs.add(lockObj, pg, inResult);
+        subs.add(lockObj, inResult);
     }
     
     public void notifySubscriptionByTs(String inSrc, long msgTs)

@@ -87,39 +87,9 @@ public class StatusMap
      * @param readTs
      * @return
      */
-    public ARResult hasLatestValue(Pageable pageable, long readTs)
+    public ARResult hasLatestValue(ReadCommand cmd)
     {
-        ARResult arrResult = null;
-        if (pageable instanceof ReadCommand)
-        {
-            ReadCommand cmd = (ReadCommand) pageable;
-            arrResult = hasLatestValueImpl(cmd.ksName, cmd.key, readTs);
-            if (!arrResult.value())
-                HBUtils.info(" [Read {} @ '{}'], doesn't have lstest data, since -> {} ", arrResult.m_key, HBUtils.dateFormat(readTs), arrResult);
-        }
-        else if (pageable instanceof Pageable.ReadCommands)
-        {
-            List<ReadCommand> readCommands = ((Pageable.ReadCommands) pageable).commands;
-            if (readCommands.size() == 1)
-            {
-                ReadCommand cmd = readCommands.get(0);
-                arrResult = hasLatestValueImpl(cmd.ksName, cmd.key, readTs);
-                if (!arrResult.value())
-                    HBUtils.info(" [Read {} @ '{}'], doesn't have lstest data, since -> {} ", arrResult.m_key, HBUtils.dateFormat(readTs), arrResult);
-            }
-            else if(readCommands.size()>1)
-            {
-                logger.error("StatusMap::hasLatestValue, Multiple read commands is not supported");
-            }
-        }
-        else if (pageable instanceof RangeSliceCommand)
-        {
-            logger.error("StatusMap::hasLatestValue, RangeSliceCommand doesn't support");
-        }
-        else
-        {
-            logger.error("StatusMap::hasLatestValue, Unkonw pageable type");
-        }
+        ARResult arrResult = hasLatestValueImpl(cmd.ksName, cmd.key, cmd.timestamp);
         return arrResult == null ? new ARResult("", m_emptyBlockMap) : arrResult;
     }
     

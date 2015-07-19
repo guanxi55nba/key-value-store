@@ -44,7 +44,7 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
     {
         try
         {
-			if (!HBUtils.SYSTEM_KEYSPACES.contains(message.payload.getKeyspaceName())) {
+			if (HBUtils.isValidKsName(message.payload.getKeyspaceName())) {
 				HBUtils.info("mutation number {}", m_counter.incrementAndGet());
 			}
             // Check if there were any forwarding headers in this message

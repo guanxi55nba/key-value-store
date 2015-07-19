@@ -17,20 +17,25 @@
  */
 package org.apache.cassandra.db;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.cassandra.db.filter.TombstoneOverwhelmingException;
+import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
+import org.apache.cassandra.heartbeat.status.ARResult;
+import org.apache.cassandra.heartbeat.status.StatusMap;
+import org.apache.cassandra.heartbeat.utils.ConfReader;
+import org.apache.cassandra.heartbeat.utils.HBUtils;
 import org.apache.cassandra.net.IVerbHandler;
 import org.apache.cassandra.net.MessageIn;
 import org.apache.cassandra.net.MessageOut;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.tracing.Tracing;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ReadVerbHandler implements IVerbHandler<ReadCommand>
 {
     private static final Logger logger = LoggerFactory.getLogger( ReadVerbHandler.class );
+    private Object lock = new Object();
 
     public void doVerb(MessageIn<ReadCommand> message, int id)
     {
@@ -40,6 +45,26 @@ public class ReadVerbHandler implements IVerbHandler<ReadCommand>
         }
 
         ReadCommand command = message.payload;
+        if (ConfReader.heartbeatEnable() && HBUtils.isValidRead(command))
+        {
+            ARResult result = StatusMap.instance.hasLatestValue(command);
+            if (!result.value())
+            {
+                // sink subscription
+                synchronized (lock)
+                {
+                    try
+                    {
+                        ReadHandler.sinkRead(command, lock, result);
+                        lock.wait();
+                    }
+                    catch (Exception e)
+                    {
+                        HBUtils.error("Exception: {}", e.getMessage());
+                    }
+                }
+            }
+        }
         Keyspace keyspace = Keyspace.open(command.ksName);
         Row row;
         try

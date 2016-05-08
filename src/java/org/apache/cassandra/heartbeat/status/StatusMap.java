@@ -69,7 +69,7 @@ public class StatusMap
 
 				ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> srcVnMap = keySrcVnMapEntry.getValue();
 				for (Entry<String, ConcurrentSkipListMap<Long, Long>> srcVnMapEntry : srcVnMap.entrySet()) {
-					keyStatus.updateStatus(inSynMsg.getKsName(), srcVnMapEntry.getKey(), srcVnMapEntry.getKey(), srcVnMapEntry.getValue());
+					keyStatus.updateStatus(inSynMsg.getKsName(), keySrcVnMapEntry.getKey(), srcVnMapEntry.getKey(), srcVnMapEntry.getValue());
 				}
 			}
 		} else {

@@ -101,8 +101,47 @@ public class StatusSynMsg
 			}
 		}
 	}
-
+	
 	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		sb.append("{ ");
+		for (Entry<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>> keySrcVnMapEntry : m_data.entrySet()) {
+			sb.append(keySrcVnMapEntry.getKey());
+			sb.append(":");
+			sb.append(" {");
+			for (Entry<String, ConcurrentSkipListMap<Long, Long>> srcVnMapEntry : keySrcVnMapEntry.getValue().entrySet()) {
+				sb.append(srcVnMapEntry.getKey());
+				sb.append(" : ");
+				sb.append("[ ");
+				for (Entry<Long, Long> vnMapEntry : srcVnMapEntry.getValue().entrySet()) {
+					sb.append(vnMapEntry.getKey());
+					sb.append(":");
+					sb.append("'");
+					sb.append(HBUtils.dateFormat(vnMapEntry.getValue()));
+					sb.append("'");
+					sb.append(",");
+				}
+				if (srcVnMapEntry.getValue().size() > 0)
+					sb.setCharAt(sb.length() - 1, ']');
+				else
+					sb.append("]");
+				sb.append(", ");
+			}
+
+			if (keySrcVnMapEntry.getValue().size() > 0)
+				sb.setCharAt(sb.length() - 1, '}');
+			else
+				sb.append("}");
+
+			sb.append(", ");
+		}
+		sb.append("TS: ");
+		sb.append(HBUtils.dateFormat(timestamp));
+		sb.append(" }");
+		return sb.toString();
+	}
+
+	public String dataCopyToString() {
 		StringBuilder sb = new StringBuilder();
 		sb.append("{ ");
 		for (Entry<String, HashMap<String, TreeMap<Long, Long>>> keySrcVnMapEntry : m_dataCopy.entrySet()) {

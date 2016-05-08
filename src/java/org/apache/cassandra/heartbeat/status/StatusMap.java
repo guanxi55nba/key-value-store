@@ -8,11 +8,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 import org.apache.cassandra.db.Mutation;
-import org.apache.cassandra.db.RangeSliceCommand;
 import org.apache.cassandra.db.ReadCommand;
 import org.apache.cassandra.heartbeat.StatusSynMsg;
+import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
 import org.apache.cassandra.heartbeat.utils.HBUtils;
-import org.apache.cassandra.service.pager.Pageable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,28 +44,32 @@ public class StatusMap
      * @param inSrcName
      * @param inSynMsg
      */
-    public void updateStatusMap(final String inSrcName, final StatusSynMsg inSynMsg)
-    {
-        if (inSynMsg != null)
-        {
-        	KeyStatus keyStatus = getKeyStatus(inSynMsg.getKsName(), inSrcName);
-        	keyStatus.setUpdateTs(inSynMsg.getTimestamp());
-        	ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>> synMsgData = inSynMsg.getData();
+	public void updateStatusMap(final String inSrcName, final StatusSynMsg inSynMsg) {
+		if (inSynMsg != null) {
+			KeyStatus keyStatus = getKeyStatus(inSynMsg.getKsName(), inSrcName);
+			if (inSynMsg.getTimestamp() <= 0)
+				return;
+
+			keyStatus.setUpdateTs(inSynMsg.getTimestamp());
+			ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>> synMsgData = inSynMsg.getData();
 			for (Entry<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>> keySrcVnMapEntry : synMsgData.entrySet()) {
-				if(keySrcVnMapEntry.getValue().isEmpty())
+
+				// Notify sinked read handler
+				for (Map.Entry<String, Status> entry : keyStatus.getKeyStatusMapCopy().entrySet())
+					ReadHandler.notifyByTs(inSynMsg.getKsName(), inSrcName, entry.getKey(), keyStatus.getUpdateTs());
+
+				if (keySrcVnMapEntry.getValue().isEmpty())
 					continue;
-				
+
 				ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> srcVnMap = keySrcVnMapEntry.getValue();
 				for (Entry<String, ConcurrentSkipListMap<Long, Long>> srcVnMapEntry : srcVnMap.entrySet()) {
-					keyStatus.updateStatus(inSynMsg.getKsName(), keySrcVnMapEntry.getKey(), srcVnMapEntry.getKey(), srcVnMapEntry.getValue());
+					keyStatus.updateStatus(inSynMsg.getKsName(), srcVnMapEntry.getKey(), keySrcVnMapEntry.getKey(), srcVnMapEntry.getValue());
 				}
 			}
-        }
-        else
-        {
-            HBUtils.error("inSynMsg is null");
-        }
-    }
+		} else {
+			HBUtils.error("inSynMsg is null");
+		}
+	}
     
     /**
      * Called when a new mutation arrives

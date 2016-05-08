@@ -39,19 +39,12 @@ public class KeyStatus
     }
     
 	public void updateStatus(final String ksName, final String inKey, final String inSrc, ConcurrentSkipListMap<Long, Long> inVnTsData) {
-		if (m_updateTs > 0) {
-			// Notify sinked read handler
-			HashMap<String, Status> copy = Maps.newHashMap(m_keyStatusMap);
-			for (Map.Entry<String, Status> entry : copy.entrySet())
-				ReadHandler.notifyByTs(ksName, inSrc, entry.getKey(), m_updateTs);
+		// Get status object and update data
+		Status status = getStatus(inKey);
+		status.addVnTsData(inVnTsData);
 
-			// Get status object and update data
-			Status status = getStatus(inKey);
-			status.addVnTsData(inVnTsData);
-
-			// Notify sinked read handler
-			ReadHandler.notifyByTs(ksName, inSrc, inKey, m_updateTs);
-		}
+		// Notify sinked read handler
+		ReadHandler.notifyByTs(ksName, inSrc, inKey, m_updateTs);
 	}
     
     public void removeEntry(final String inSrc, final String ksName, final Collection<ColumnFamily> CFS)
@@ -143,5 +136,13 @@ public class KeyStatus
         if (inUpdateTs > m_updateTs)
             m_updateTs = inUpdateTs;
     }
+    
+	public HashMap<String, Status> getKeyStatusMapCopy() {
+		return Maps.newHashMap(m_keyStatusMap);
+	}
+	
+	public long getUpdateTs() {
+		return m_updateTs;
+	}
     
 }

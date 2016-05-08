@@ -13,7 +13,7 @@ public class ARResult
 {
     String m_key;
     boolean m_hasLatestValue;
-    HashMap<String, KeyResult> m_blockMap;
+    HashMap<String, KeyResult> m_blockMap; // src, key result
 
     public ARResult(String inKey, HashMap<String, KeyResult> blockMap)
     {

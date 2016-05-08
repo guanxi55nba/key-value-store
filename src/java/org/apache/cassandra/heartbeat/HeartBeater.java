@@ -43,7 +43,8 @@ import com.google.common.util.concurrent.Uninterruptibles;
 public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterMBean {
     private static final Logger logger = LoggerFactory.getLogger(HeartBeater.class);
     private static final String MBEAN_NAME = "org.apache.cassandra.net:type=HeartBeater";
-    private static final DebuggableScheduledThreadPoolExecutor executor = new DebuggableScheduledThreadPoolExecutor("HeartBeatTasks");
+    private static final DebuggableScheduledThreadPoolExecutor executor = new DebuggableScheduledThreadPoolExecutor(1,"HeartBeatTasks",Thread.MAX_PRIORITY);
+//    private static final DebuggableScheduledThreadPoolExecutor executor = new DebuggableScheduledThreadPoolExecutor("HeartBeatTasks");
     public final static int intervalInMillis = ConfReader.getHeartbeatInterval();
     private final Comparator<InetAddress> inetcomparator = new Comparator<InetAddress>()
     {
@@ -160,7 +161,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
     }
 
     /**
-     * Called by {@link Mutation.apply}
+     * <-- called by {@link Mutation.apply}
      * 
      * @param mutation
      */
@@ -174,9 +175,9 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
                 Version vn = HBUtils.getMutationVersion(cf);
                 if (vn != null)
                 {
-                    long versionNo = localSrcName.equalsIgnoreCase(source) ? vn.getLocalVersion() : -1;
                     long timestamp = vn.getTimestamp() / 1000;
-                    updateStatusMsgMap(ksName, partitionKey, versionNo, timestamp);
+                    
+                    updateStatusMsgMap(ksName, partitionKey,source, vn.getLocalVersion(), timestamp);
                 }
                 else
                 {
@@ -201,7 +202,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
             try
             {
                 String source = value.getString(HBConsts.SOURCE);
-                long vn = localSrcName.equalsIgnoreCase(source) ? value.getLong(HBConsts.VERSON_NO) : -1;
+                long vn = value.getLong(HBConsts.VERSON_NO);
                 long ts = value.getLong(HBConsts.VERSION_WRITE_TIME) / 1000;
                 ConcurrentHashMap<ByteBuffer, AtomicLong> keyToVn = m_versionMaps.get(inKSName);
                 if (keyToVn == null)
@@ -210,7 +211,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
                     m_versionMaps.put(inKSName, keyToVn);
                 }
                 keyToVn.put(partitionKey, new AtomicLong(vn));
-                updateStatusMsgMap(inKSName, partitionKey, vn, ts);
+                updateStatusMsgMap(inKSName, partitionKey, source,vn, ts);
             }
             catch (Exception e)
             {
@@ -226,7 +227,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
      * @param version
      * @param ts
      */
-    private void updateStatusMsgMap(String inKSName, ByteBuffer partitionKey, Long version, long ts)
+    private void updateStatusMsgMap(String inKSName, ByteBuffer partitionKey, String src, Long version, long ts)
     {
         List<InetAddress> replicaList = HBUtils.getReplicaListExcludeLocal(inKSName, partitionKey);
         for (InetAddress inetAddress : replicaList)
@@ -239,7 +240,7 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
                 if (statusMsgSyn == null)
                     statusMsgSyn = newMsg;
             }
-            statusMsgSyn.addKeyVersion(HBUtils.byteBufferToString( partitionKey), version, ts);
+            statusMsgSyn.addKeyVersion(HBUtils.byteBufferToString( partitionKey), src, version, ts);
         }
     }
     

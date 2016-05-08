@@ -2,11 +2,10 @@ package org.apache.cassandra.heartbeat.status;
 
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Timer;
+import java.util.*;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.RangeSliceCommand;
@@ -50,8 +49,15 @@ public class StatusMap
     {
         if (inSynMsg != null)
         {
-            KeyStatus keyStatus = getKeyStatus(inSynMsg.getKsName(), inSrcName);
-            keyStatus.updateStatus(inSrcName, inSynMsg);
+        	KeyStatus keyStatus = getKeyStatus(inSynMsg.getKsName(), inSrcName);
+        	keyStatus.setUpdateTs(inSynMsg.getTimestamp());
+        	ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>> synMsgData = inSynMsg.getData();
+			for (Entry<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>> keySrcVnMapEntry : synMsgData.entrySet()) {
+				ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> srcVnMap = keySrcVnMapEntry.getValue();
+				for (Entry<String, ConcurrentSkipListMap<Long, Long>> srcVnMapEntry : srcVnMap.entrySet()) {
+					keyStatus.updateStatus(inSynMsg.getKsName(), keySrcVnMapEntry.getKey(), srcVnMapEntry.getKey(), srcVnMapEntry.getValue());
+				}
+			}
         }
         else
         {
@@ -83,6 +89,8 @@ public class StatusMap
     }
     
     /**
+     * <-- called by {@link SelectStatement.execute}, {@link ReadVerbHandler.doVerb}
+     * 
      * @param pageable
      * @param readTs
      * @return

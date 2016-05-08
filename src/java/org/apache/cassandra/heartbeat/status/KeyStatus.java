@@ -3,9 +3,11 @@ package org.apache.cassandra.heartbeat.status;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
+import org.antlr.grammar.v3.ANTLRParser.finallyClause_return;
 import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.heartbeat.StatusSynMsg;
 import org.apache.cassandra.heartbeat.extra.Version;
@@ -36,29 +38,21 @@ public class KeyStatus
         m_keyStatusMap = new ConcurrentHashMap<String, Status>();
     }
     
-    public void updateStatus(final String inSrc, StatusSynMsg inSynMsg)
-    {
-        ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> synMsgData = inSynMsg.getData();
-        setUpdateTs(inSynMsg.getTimestamp());
-        String ksName = inSynMsg.getKsName();
-        if (m_updateTs > 0)
-        {
-            // Notify sinked read handler
-            HashMap<String, Status> copy = Maps.newHashMap(m_keyStatusMap);
-            for (Map.Entry<String, Status> entry : copy.entrySet())
-                ReadHandler.notifyByTs(ksName, inSrc, entry.getKey(), m_updateTs);
-            
-            for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : synMsgData.entrySet())
-            {
-                // Get status object and update data
-                Status status = getStatus(entry.getKey());
-                status.addVnTsData(entry.getValue());
+	public void updateStatus(final String ksName, final String inKey, final String inSrc, ConcurrentSkipListMap<Long, Long> inVnTsData) {
+		if (m_updateTs > 0) {
+			// Notify sinked read handler
+			HashMap<String, Status> copy = Maps.newHashMap(m_keyStatusMap);
+			for (Map.Entry<String, Status> entry : copy.entrySet())
+				ReadHandler.notifyByTs(ksName, inSrc, entry.getKey(), m_updateTs);
 
-                // Notify sinked read handler
-                ReadHandler.notifyByTs(ksName, inSrc, entry.getKey(), m_updateTs);
-            }
-        }
-    }
+			// Get status object and update data
+			Status status = getStatus(inKey);
+			status.addVnTsData(inVnTsData);
+
+			// Notify sinked read handler
+			ReadHandler.notifyByTs(ksName, inSrc, inKey, m_updateTs);
+		}
+	}
     
     public void removeEntry(final String inSrc, final String ksName, final Collection<ColumnFamily> CFS)
     {

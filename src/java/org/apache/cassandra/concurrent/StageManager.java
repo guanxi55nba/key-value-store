@@ -57,8 +57,12 @@ public class StageManager
         stages.put(Stage.MISC, new JMXEnabledThreadPoolExecutor(Stage.MISC));
         stages.put(Stage.READ_REPAIR, multiThreadedStage(Stage.READ_REPAIR, FBUtilities.getAvailableProcessors()));
         stages.put(Stage.TRACING, tracingExecutor());
-        //stages.put(Stage.HEARTBEAT, multiThreadedLowSignalStage(Stage.HEARTBEAT,FBUtilities.getAvailableProcessors()));
-        stages.put(Stage.HEARTBEAT, new JMXEnabledThreadPoolExecutor(Stage.HEARTBEAT));
+//        stages.put(Stage.HEARTBEAT, new JMXEnabledThreadPoolExecutor(Stage.HEARTBEAT));
+        stages.put(Stage.HEARTBEAT, new JMXEnabledThreadPoolExecutor(1, 
+        		Integer.MAX_VALUE, TimeUnit.SECONDS, 
+        		new LinkedBlockingQueue<Runnable>(), 
+        		new NamedThreadFactory(Stage.HEARTBEAT.getJmxName(), Thread.MAX_PRIORITY), 
+        		Stage.HEARTBEAT.getJmxType()));
     }
 
     private static ExecuteOnlyExecutor tracingExecutor()

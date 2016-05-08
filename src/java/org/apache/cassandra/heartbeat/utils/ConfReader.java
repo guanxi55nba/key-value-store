@@ -19,11 +19,20 @@ public class ConfReader
     public int heartbeatInternval = 10;
     public boolean quorumEnabled = false;
     private static final ConfReader instance = new ConfReader();
+    private static final String USER_DIR = "user.dir";
+    private static final String PARENT_FOLDER = "conf";
+    private static final String CONF_FILE_NAME = "key-value-store.conf";
 
     private ConfReader()
     {
         configuration = new Properties();
-        String confStr = "conf" + File.separator + "key-value-store.conf";
+        StringBuilder sb = new StringBuilder();
+        sb.append(System.getProperty(USER_DIR));
+        sb.append(File.separator);
+        sb.append(PARENT_FOLDER);
+        sb.append(File.separator);
+        sb.append(CONF_FILE_NAME);
+		String confStr = sb.toString();
         try
         {
             configuration.load(new FileInputStream(new File(confStr)));

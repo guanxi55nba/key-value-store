@@ -53,6 +53,9 @@ public class StatusMap
         	keyStatus.setUpdateTs(inSynMsg.getTimestamp());
         	ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>> synMsgData = inSynMsg.getData();
 			for (Entry<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>> keySrcVnMapEntry : synMsgData.entrySet()) {
+				if(keySrcVnMapEntry.getValue().isEmpty())
+					continue;
+				
 				ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> srcVnMap = keySrcVnMapEntry.getValue();
 				for (Entry<String, ConcurrentSkipListMap<Long, Long>> srcVnMapEntry : srcVnMap.entrySet()) {
 					keyStatus.updateStatus(inSynMsg.getKsName(), keySrcVnMapEntry.getKey(), srcVnMapEntry.getKey(), srcVnMapEntry.getValue());

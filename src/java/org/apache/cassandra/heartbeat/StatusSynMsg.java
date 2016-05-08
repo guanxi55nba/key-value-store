@@ -105,11 +105,11 @@ public class StatusSynMsg
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 		sb.append("{ ");
-		for (Entry<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>> keySrcVnMapEntry : m_data.entrySet()) {
+		for (Entry<String, HashMap<String, TreeMap<Long, Long>>> keySrcVnMapEntry : m_dataCopy.entrySet()) {
 			sb.append(keySrcVnMapEntry.getKey());
 			sb.append(":");
 			sb.append(" {");
-			for (Entry<String, ConcurrentSkipListMap<Long, Long>> srcVnMapEntry : keySrcVnMapEntry.getValue().entrySet()) {
+			for (Entry<String, TreeMap<Long, Long>> srcVnMapEntry : keySrcVnMapEntry.getValue().entrySet()) {
 				sb.append(srcVnMapEntry.getKey());
 				sb.append(" : ");
 				sb.append("[ ");
@@ -170,14 +170,15 @@ public class StatusSynMsg
     
 	HashMap<String, HashMap<String, TreeMap<Long, Long>>> getNonEmmptyData() {
 		HashMap<String, HashMap<String, TreeMap<Long, Long>>> dataCopy = Maps.newHashMap();
-		for (Map.Entry<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>> entry : m_data.entrySet()) {
-			if (!entry.getValue().isEmpty()) {
+		for (Entry<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>> keySrcVnMap : m_data.entrySet()) {
+			if (!keySrcVnMap.getValue().isEmpty()) {
 				HashMap<String, TreeMap<Long, Long>> srcToVnMap = Maps.newHashMap();
-				for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> subEntry : entry.getValue().entrySet()) {
-					if (!subEntry.getValue().isEmpty())
-						srcToVnMap.put(entry.getKey(), Maps.newTreeMap(subEntry.getValue()));
+				for (Entry<String, ConcurrentSkipListMap<Long, Long>> subVnMapEntry : keySrcVnMap.getValue().entrySet()) {
+					if (!subVnMapEntry.getValue().isEmpty()) {
+						srcToVnMap.put(subVnMapEntry.getKey(), Maps.newTreeMap(subVnMapEntry.getValue()));
+					}
 				}
-				dataCopy.put(entry.getKey(), srcToVnMap);
+				dataCopy.put(keySrcVnMap.getKey(), srcToVnMap);
 			}
 		}
 		return dataCopy;

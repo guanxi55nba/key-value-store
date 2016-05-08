@@ -217,7 +217,8 @@ public class StatusSynMsg
 						srcToVnMap.put(subVnMapEntry.getKey(), Maps.newTreeMap(subVnMapEntry.getValue()));
 					}
 				}
-				dataCopy.put(keySrcVnMap.getKey(), srcToVnMap);
+				if (!srcToVnMap.isEmpty())
+					dataCopy.put(keySrcVnMap.getKey(), srcToVnMap);
 			}
 		}
 		return dataCopy;

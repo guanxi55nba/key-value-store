@@ -11,6 +11,7 @@ import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.ReadCommand;
 import org.apache.cassandra.heartbeat.StatusSynMsg;
 import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
+import org.apache.cassandra.heartbeat.utils.ConfReader;
 import org.apache.cassandra.heartbeat.utils.HBUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +46,9 @@ public class StatusMap
      * @param inSynMsg
      */
 	public void updateStatusMap(final String inSrcName, final StatusSynMsg inSynMsg) {
+		if(ConfReader.isLogEnabled())
+			logger.info("Receive status msg to {} from {}", inSynMsg, inSrcName);
+		
 		if (inSynMsg != null) {
 			KeyStatus keyStatus = getKeyStatus(inSynMsg.getKsName(), inSrcName);
 			if (inSynMsg.getTimestamp() <= 0)
@@ -52,18 +56,20 @@ public class StatusMap
 
 			keyStatus.setUpdateTs(inSynMsg.getTimestamp());
 			ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>> synMsgData = inSynMsg.getData();
+			// Notify sinked read handler
+			for (Map.Entry<String, Status> entry : keyStatus.getKeyStatusMapCopy().entrySet())
+				ReadHandler.notifyByTs(inSynMsg.getKsName(), inSrcName, entry.getKey(), keyStatus.getUpdateTs());
+			
+			if(synMsgData.isEmpty())
+				return;
+			
 			for (Entry<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>> keySrcVnMapEntry : synMsgData.entrySet()) {
-
-				// Notify sinked read handler
-				for (Map.Entry<String, Status> entry : keyStatus.getKeyStatusMapCopy().entrySet())
-					ReadHandler.notifyByTs(inSynMsg.getKsName(), inSrcName, entry.getKey(), keyStatus.getUpdateTs());
-
 				if (keySrcVnMapEntry.getValue().isEmpty())
 					continue;
 
 				ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> srcVnMap = keySrcVnMapEntry.getValue();
 				for (Entry<String, ConcurrentSkipListMap<Long, Long>> srcVnMapEntry : srcVnMap.entrySet()) {
-					keyStatus.updateStatus(inSynMsg.getKsName(), srcVnMapEntry.getKey(), keySrcVnMapEntry.getKey(), srcVnMapEntry.getValue());
+					keyStatus.updateStatus(inSynMsg.getKsName(), srcVnMapEntry.getKey(), srcVnMapEntry.getKey(), srcVnMapEntry.getValue());
 				}
 			}
 		} else {

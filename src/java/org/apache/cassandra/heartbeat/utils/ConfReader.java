@@ -18,6 +18,7 @@ public class ConfReader
     public boolean logEnabled = false;
     public int heartbeatInternval = 10;
     public boolean quorumEnabled = false;
+    public int majorityNo = 2;
     private static final ConfReader instance = new ConfReader();
     private static final String USER_DIR = "user.dir";
     private static final String PARENT_FOLDER = "conf";
@@ -40,6 +41,7 @@ public class ConfReader
             logEnabled = Boolean.valueOf(configuration.getProperty("log.enable")) && heartbeatEnable;
             heartbeatInternval = Integer.valueOf(configuration.getProperty("heartbeat.interval"));
             quorumEnabled = Boolean.valueOf(configuration.getProperty("enable.write-read-local-quorum"));
+            majorityNo = Integer.valueOf(configuration.getProperty("majority.no"));
         }
         catch (IOException e)
         {
@@ -67,4 +69,8 @@ public class ConfReader
     {
         return instance.logEnabled;
     }
+    
+	public static int getMajorityNo() {
+		return instance.majorityNo;
+	}
 }

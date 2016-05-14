@@ -5,7 +5,6 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 
 import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.ReadCommand;
@@ -30,7 +29,7 @@ public class StatusMap
 {
     private static final Logger logger = LoggerFactory.getLogger(StatusMap.class);
     ConcurrentHashMap<String, ConcurrentHashMap<String, KeyStatus>> m_currentEntries = 
-            new ConcurrentHashMap<String, ConcurrentHashMap<String, KeyStatus>>(); // keyspace, src, keystatus
+            new ConcurrentHashMap<String, ConcurrentHashMap<String, KeyStatus>>(1,1,32); // keyspace, src, keystatus
     public static final StatusMap instance = new StatusMap();
     HashMap<String, KeyResult> m_emptyBlockMap = Maps.newHashMap();
 
@@ -50,26 +49,35 @@ public class StatusMap
 			logger.info("Receive status msg to {} from {}", inSynMsg, inSrcName);
 		
 		if (inSynMsg != null) {
-			KeyStatus keyStatus = getKeyStatus(inSynMsg.getKsName(), inSrcName);
+			String ksName = inSynMsg.getKsName();
+			KeyStatus keyStatus = getKeyStatus(ksName, inSrcName);
 			if (inSynMsg.getTimestamp() <= 0)
 				return;
 
 			keyStatus.setUpdateTs(inSynMsg.getTimestamp());
-			ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>> synMsgData = inSynMsg.getData();
+			HashMap<String, HashMap<String, TreeMap<Long, Long>>> synMsgData = inSynMsg.getDataCopy();
+			
 			// Notify sinked read handler
-			for (Map.Entry<String, Status> entry : keyStatus.getKeyStatusMapCopy().entrySet())
-				ReadHandler.notifyByTs(inSynMsg.getKsName(), inSrcName, entry.getKey(), keyStatus.getUpdateTs());
+			for (Map.Entry<String, Status> entry : keyStatus.getKeyStatusMap().entrySet())
+				ReadHandler.notifyByTs(ksName, inSrcName, entry.getKey(), keyStatus.getUpdateTs());
 			
 			if(synMsgData.isEmpty())
 				return;
 			
-			for (Entry<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>> keySrcVnMapEntry : synMsgData.entrySet()) {
+			for (Entry<String, HashMap<String, TreeMap<Long, Long>>> keySrcVnMapEntry : synMsgData.entrySet()) {
 				if (keySrcVnMapEntry.getValue().isEmpty())
 					continue;
 
-				ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> srcVnMap = keySrcVnMapEntry.getValue();
-				for (Entry<String, ConcurrentSkipListMap<Long, Long>> srcVnMapEntry : srcVnMap.entrySet()) {
-					keyStatus.updateStatus(inSynMsg.getKsName(), keySrcVnMapEntry.getKey(), srcVnMapEntry.getKey(), srcVnMapEntry.getValue());
+				String key = keySrcVnMapEntry.getKey();
+				HashMap<String, TreeMap<Long, Long>> srcVnMap = keySrcVnMapEntry.getValue();
+				
+				for (Entry<String, TreeMap<Long, Long>> srcVnMapEntry : srcVnMap.entrySet()) {
+					if (srcVnMapEntry.getValue().isEmpty())
+						continue;
+
+					String src = srcVnMapEntry.getKey();
+					KeyStatus otherSrcKeyStatus = getKeyStatus(ksName, src);
+					otherSrcKeyStatus.updateStatus(ksName, key, src, srcVnMapEntry.getValue());
 				}
 			}
 		} else {
@@ -150,7 +158,7 @@ public class StatusMap
         ConcurrentHashMap<String, KeyStatus> srcToKeyStatus = m_currentEntries.get(ksName);
         if (srcToKeyStatus == null)
         {
-            ConcurrentHashMap<String, KeyStatus> temp1 = new ConcurrentHashMap<String, KeyStatus>();
+            ConcurrentHashMap<String, KeyStatus> temp1 = new ConcurrentHashMap<String, KeyStatus>(3,1,32);
             srcToKeyStatus = m_currentEntries.putIfAbsent(ksName, temp1);
             if (srcToKeyStatus == null)
                 srcToKeyStatus = temp1;

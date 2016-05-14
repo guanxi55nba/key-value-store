@@ -61,7 +61,7 @@ public class StageManager
         stages.put(Stage.HEARTBEAT, new JMXEnabledThreadPoolExecutor(1, 
         		Integer.MAX_VALUE, TimeUnit.SECONDS, 
         		new LinkedBlockingQueue<Runnable>(), 
-        		new NamedThreadFactory(Stage.HEARTBEAT.getJmxName(), Thread.MAX_PRIORITY), 
+        		new NamedThreadFactory(Stage.HEARTBEAT.getJmxName(), Thread.NORM_PRIORITY), 
         		Stage.HEARTBEAT.getJmxType()));
     }
 

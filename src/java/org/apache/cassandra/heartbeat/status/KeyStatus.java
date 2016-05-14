@@ -1,8 +1,6 @@
 package org.apache.cassandra.heartbeat.status;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -30,15 +28,14 @@ import com.google.common.collect.Maps;
 public class KeyStatus
 {
     private static final Logger logger = LoggerFactory.getLogger(KeyStatus.class);
-    private ConcurrentHashMap<String, Status> m_keyStatusMap; // key, status
+    private ConcurrentHashMap<String, Status> m_keyStatusMap = new ConcurrentHashMap<String, Status>(640,8,64); // key, status
     private long m_updateTs = -1;
     
     public KeyStatus()
     {
-        m_keyStatusMap = new ConcurrentHashMap<String, Status>();
     }
     
-	public void updateStatus(final String ksName, final String inKey, final String inSrc, ConcurrentSkipListMap<Long, Long> inVnTsData) {
+	public void updateStatus(final String ksName, final String inKey, final String inSrc, TreeMap<Long, Long> inVnTsData) {
 		// Get status object and update data
 		Status status = getStatus(inKey);
 		status.addVnTsData(inVnTsData);
@@ -47,29 +44,21 @@ public class KeyStatus
 		ReadHandler.notifyByTs(ksName, inSrc, inKey, m_updateTs);
 	}
     
-    public void removeEntry(final String inSrc, final String ksName, final Collection<ColumnFamily> CFS)
-    {
-        if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName))
-        {
-            for (ColumnFamily cf : CFS)
-            {
-                Version version = HBUtils.getMutationVersion(cf);
-                if (version != null)
-                {
-                    String key = HBUtils.getPrimaryKeyName(cf.metadata());
-                    Status status = getStatus(key);
-                    status.removeEntry(version.getLocalVersion(), version.getTimestamp());
-                    
-                    // Notify read subscription
-                    ReadHandler.notifyByVn(ksName, inSrc, key, version.getLocalVersion());
-                }
-                else
-                {
-                    HBUtils.error("KeyStatus::updateStatus, version value is null, ColumnFamily: {}", cf.toString());
-                }
-            }
-        }
-    }
+	public void removeEntry(final String inSrc, final String ksName, final Collection<ColumnFamily> CFS) {
+		for (ColumnFamily cf : CFS) {
+			Version version = HBUtils.getMutationVersion(cf);
+			if (version != null) {
+				String key = HBUtils.getPrimaryKeyName(cf.metadata());
+				Status status = getStatus(key);
+				status.removeEntry(version.getLocalVersion(), version.getTimestamp());
+
+				// Notify read subscription
+				ReadHandler.notifyByVn(ksName, inSrc, key, version.getLocalVersion());
+			} else {
+				HBUtils.error("KeyStatus::updateStatus, version value is null, ColumnFamily: {}", cf.toString());
+			}
+		}
+	}
     
     public KeyResult hasLatestValue(String key, long inReadTs)
     {
@@ -139,6 +128,10 @@ public class KeyStatus
     
 	public HashMap<String, Status> getKeyStatusMapCopy() {
 		return Maps.newHashMap(m_keyStatusMap);
+	}
+	
+	public ConcurrentHashMap<String, Status> getKeyStatusMap(){
+		return m_keyStatusMap;
 	}
 	
 	public long getUpdateTs() {

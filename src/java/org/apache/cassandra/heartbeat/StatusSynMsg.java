@@ -31,6 +31,7 @@ public class StatusSynMsg
     long timestamp;
     private ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>> m_data = 
     		new ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>>();
+    
     private HashMap<String,HashMap<String, TreeMap<Long, Long>>> m_dataCopy;
     
     public StatusSynMsg(String ksName, long timestamp)
@@ -243,6 +244,7 @@ public class StatusSynMsg
             m_data = dataCopy;
     }
     
+    
     /**
      * Only used to speed up the serialization
      * 
@@ -307,18 +309,18 @@ class StatusMsgSerializationHelper implements IVersionedSerializer<StatusSynMsg>
 		String ksName = in.readUTF();
 		long timestamp = in.readLong();
 		int keySrcVnMapSize = in.readInt();
-		ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>> keySrcVnMap = 
-				new ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>>();
+		HashMap<String,HashMap<String, TreeMap<Long, Long>>> keySrcVnMap = 
+				new HashMap<String,HashMap<String, TreeMap<Long, Long>>>();
 
 		for (int i = 0; i < keySrcVnMapSize; i++) {
 			String key = in.readUTF();
 			int srcVnMapSize = in.readInt();
-			ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> srcVnMap = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>();
+			HashMap<String, TreeMap<Long, Long>> srcVnMap = new HashMap<String, TreeMap<Long, Long>>();
 
 			for (int j = 0; j < srcVnMapSize; j++) {
 				String src = in.readUTF();
 				int vnMapSize = in.readInt();
-				ConcurrentSkipListMap<Long, Long> vnMap = new ConcurrentSkipListMap<Long, Long>();
+				TreeMap<Long, Long> vnMap = new TreeMap<Long, Long>();
 
 				for (int k = 0; k < vnMapSize; k++)
 					vnMap.put(in.readLong(), in.readLong());

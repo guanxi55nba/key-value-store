@@ -32,6 +32,8 @@ public class StatusMap
             new ConcurrentHashMap<String, ConcurrentHashMap<String, KeyStatus>>(1,1,32); // keyspace, src, keystatus
     public static final StatusMap instance = new StatusMap();
     HashMap<String, KeyResult> m_emptyBlockMap = Maps.newHashMap();
+    
+    private String m_address = "";
 
     private StatusMap()
     {
@@ -76,8 +78,13 @@ public class StatusMap
 						continue;
 
 					String src = srcVnMapEntry.getKey();
-					KeyStatus otherSrcKeyStatus = getKeyStatus(ksName, src);
-					otherSrcKeyStatus.updateStatus(ksName, key, src, srcVnMapEntry.getValue());
+					
+					if (inSrcName.equals(src)) {
+						keyStatus.updateStatus(ksName, key, src, srcVnMapEntry.getValue());
+					} else if (!inSrcName.equals(getLocalAddress())) {
+						KeyStatus otherSrcKeyStatus = getKeyStatus(ksName, src);
+						otherSrcKeyStatus.updateStatus(ksName, key, src, srcVnMapEntry.getValue());
+					}
 				}
 			}
 		} else {
@@ -224,5 +231,12 @@ public class StatusMap
         }
         HBUtils.info("StatusMap -> ({} ) ", sb.toString());
     }
+    
+	private String getLocalAddress() {
+		if (m_address.isEmpty()) {
+			m_address = HBUtils.getLocalAddress().getHostAddress();
+		}
+		return m_address;
+	}
 
 }

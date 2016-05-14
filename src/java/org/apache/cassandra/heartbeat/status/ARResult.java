@@ -21,7 +21,7 @@ public class ARResult
     {
         m_key = inKey;
         m_blockMap = blockMap;
-        m_hasLatestValue = m_blockMap.size()<ConfReader.getMajorityNo();
+        m_hasLatestValue = m_blockMap.size()<ConfReader.getMajorityNo()-1;
     }
     
     public boolean value()

@@ -6,22 +6,12 @@ import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.cassandra.config.CFMetaData;
-import org.apache.cassandra.config.ColumnDefinition;
-import org.apache.cassandra.config.DatabaseDescriptor;
-import org.apache.cassandra.config.Schema;
-import org.apache.cassandra.cql3.QueryProcessor;
-import org.apache.cassandra.cql3.UntypedResultSet;
+import org.apache.cassandra.config.*;
+import org.apache.cassandra.cql3.*;
 import org.apache.cassandra.cql3.UntypedResultSet.Row;
-import org.apache.cassandra.cql3.UpdateParameters;
-import org.apache.cassandra.db.Cell;
-import org.apache.cassandra.db.ColumnFamily;
-import org.apache.cassandra.db.ColumnFamilyStore;
-import org.apache.cassandra.db.ConsistencyLevel;
-import org.apache.cassandra.db.Keyspace;
-import org.apache.cassandra.db.RangeSliceCommand;
-import org.apache.cassandra.db.ReadCommand;
+import org.apache.cassandra.db.*;
 import org.apache.cassandra.db.composites.CellName;
 import org.apache.cassandra.db.composites.CellNames;
 import org.apache.cassandra.db.composites.Composite;
@@ -42,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 public class HBUtils
 {
@@ -53,6 +44,9 @@ public class HBUtils
 	public static ByteBuffer srcColName = ByteBufferUtil.bytes(HBConsts.SOURCE);
 	public static final List<String> SYSTEM_KEYSPACES = Lists.newArrayList("system", "system_traces");;
 	private static InetAddress localInetAddress;
+	private static final String CF_NAME = "usertable";
+	private static final ConcurrentHashMap<String, ConcurrentHashMap<String, Set<String>>> replicaMap = 
+			new ConcurrentHashMap<String, ConcurrentHashMap<String, Set<String>>>();
 	
 	/**
 	 * Get the replica node ip addresses based on the partition key exception local address
@@ -80,6 +74,35 @@ public class HBUtils
             replicaList.remove(getLocalAddress());
         return replicaList;
     }
+    
+	public static boolean keyOnThisNode(String inKsName, String inKey, String inIpAddress) {
+
+		ConcurrentHashMap<String, Set<String>> keyToReplicaSet = replicaMap.get(inKsName);
+		if (keyToReplicaSet == null) {
+			ConcurrentHashMap<String, Set<String>> temp = new ConcurrentHashMap<String, Set<String>>();
+			keyToReplicaSet = replicaMap.putIfAbsent(inKsName, temp);
+			if (keyToReplicaSet == null)
+				keyToReplicaSet = temp;
+		}
+
+		Set<String> replicaSet = keyToReplicaSet.get(inKey);
+		if (replicaSet == null) {
+			Set<String> temp2 = Sets.newConcurrentHashSet();
+			replicaSet = keyToReplicaSet.putIfAbsent(inKey, temp2);
+			if (replicaSet == null)
+				replicaSet = temp2;
+		}
+
+		if (replicaSet.isEmpty()) {
+
+			List<InetAddress> replicaList = StorageService.instance.getNaturalEndpoints(inKsName, CF_NAME, inKey);
+
+			for (InetAddress src : replicaList) {
+				replicaSet.add(src.getHostAddress());
+			}
+		}
+		return replicaSet.contains(inIpAddress);
+	}
 	
 
 	/**

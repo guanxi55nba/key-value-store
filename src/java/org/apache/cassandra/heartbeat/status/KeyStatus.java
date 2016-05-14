@@ -1,13 +1,10 @@
 package org.apache.cassandra.heartbeat.status;
 
 import java.util.*;
-import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
-import org.antlr.grammar.v3.ANTLRParser.finallyClause_return;
 import org.apache.cassandra.db.ColumnFamily;
-import org.apache.cassandra.heartbeat.StatusSynMsg;
 import org.apache.cassandra.heartbeat.extra.Version;
 import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
 import org.apache.cassandra.heartbeat.utils.HBUtils;
@@ -67,38 +64,31 @@ public class KeyStatus
         boolean causedByVn = false;
         long version = -1;
         Status status = m_keyStatusMap.get(key);
-        if (status == null || m_updateTs <= inReadTs)
-        {
-            hasLatestValue = false;
-            causedByTs = true;
-        }
-        else
-        {
-            ConcurrentSkipListMap<Long, Long> versions = status.getVnToTsMap(); // vn: ts
-            // if doesn't exist version whose timestamp <= read ts, then this node contains the latest data
-            long previousVn = -1;
-            for (Map.Entry<Long, Long> entry : versions.entrySet())
-            {
-                Long localVn = entry.getKey(), timestamp = entry.getValue();
-                if (localVn >= 0)
-                {
-                    if (timestamp <= inReadTs)
-                    {
-                        hasLatestValue = false;
-                    }
-                    else
-                    {
-                        if (!hasLatestValue && (localVn - previousVn) == 1)
-                        {
-                            version = previousVn;
-                            causedByVn = true;
-                        }
-                        break;
-                    }
-                    previousVn = entry.getKey();
-                }
-            }
-        }
+		if (m_updateTs <= inReadTs) {
+			hasLatestValue = false;
+			causedByTs = true;
+			//HBUtils.error("Update ts: " + HBUtils.dateFormat(m_updateTs) + ", Read Ts: " + HBUtils.dateFormat(inReadTs));
+		} else if (status != null) {
+			ConcurrentSkipListMap<Long, Long> versions = status.getVnToTsMap(); // vn: ts
+			// if doesn't exist version whose timestamp <= read ts, then this
+			// node contains the latest data
+			long previousVn = -1;
+			for (Map.Entry<Long, Long> entry : versions.entrySet()) {
+				Long localVn = entry.getKey(), timestamp = entry.getValue();
+				if (localVn >= 0) {
+					if (timestamp <= inReadTs) {
+						hasLatestValue = false;
+					} else {
+						if (!hasLatestValue && (localVn - previousVn) == 1) {
+							version = previousVn;
+							causedByVn = true;
+						}
+						break;
+					}
+					previousVn = entry.getKey();
+				}
+			}
+		}
         return new KeyResult(hasLatestValue, causedByTs, causedByVn, version);
     }
     
@@ -120,10 +110,12 @@ public class KeyStatus
         return m_keyStatusMap.values().size();
     }
     
-    public void setUpdateTs(long inUpdateTs)
+    public void setUpdateTs(String inKsName, String inSrcName, long inUpdateTs)
     {
-        if (inUpdateTs > m_updateTs)
-            m_updateTs = inUpdateTs;
+		if (inUpdateTs > m_updateTs) {
+			m_updateTs = inUpdateTs;
+			ReadHandler.notifyBySrc(inKsName, inSrcName, inUpdateTs);
+		}
     }
     
 	public HashMap<String, Status> getKeyStatusMapCopy() {

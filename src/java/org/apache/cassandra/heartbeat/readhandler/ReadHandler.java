@@ -1,8 +1,7 @@
 package org.apache.cassandra.heartbeat.readhandler;
 
-import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.cassandra.db.ReadCommand;
@@ -31,6 +30,8 @@ public class ReadHandler
         //scheduleTimer();
     }
     
+    
+    
     public static void notifyByTs(String ksName, String inSrc, String key, final long msgTs)
     {
         instance.notifySubscriptionByTs(ksName, inSrc, key, msgTs);
@@ -41,10 +42,23 @@ public class ReadHandler
         instance.notifySubscriptionByVn(ksName, inSrc, key, msgVn);
     }
     
+    public static void notifyBySrc(String ksName, String inSrc, final long msgTs) {
+    	instance.notifyAllSubscription(ksName, inSrc, msgTs);
+    }
+    
     public static void sinkRead(ReadCommand cmd, Object lock, ARResult inResult)
     {
         instance.sinkSubscription(cmd, lock, inResult);
     }
+    
+	void notifyAllSubscription(String ksName, String inSrc, final long msgTs) {
+		ConcurrentHashMap<String, KeySubscriptions> keyToSubs = m_subscriptionMatrics.get(ksName);
+		if (keyToSubs != null) {
+			for (Entry<String, KeySubscriptions> entry : keyToSubs.entrySet()) {
+				entry.getValue().notifySubscriptionByTs(inSrc, msgTs);
+			}
+		}
+	}
 
     void notifySubscriptionByTs(String ksName, String inSrc, String key, final long msgTs)
     {

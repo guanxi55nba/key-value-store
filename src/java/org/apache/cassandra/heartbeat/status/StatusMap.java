@@ -56,12 +56,10 @@ public class StatusMap
 			if (inSynMsg.getTimestamp() <= 0)
 				return;
 
-			keyStatus.setUpdateTs(inSynMsg.getTimestamp());
-			HashMap<String, HashMap<String, TreeMap<Long, Long>>> synMsgData = inSynMsg.getDataCopy();
+			// Update ts, and inform related subscription
+			keyStatus.setUpdateTs(ksName,inSrcName,inSynMsg.getTimestamp());
 			
-			// Notify sinked read handler
-			for (Map.Entry<String, Status> entry : keyStatus.getKeyStatusMap().entrySet())
-				ReadHandler.notifyByTs(ksName, inSrcName, entry.getKey(), keyStatus.getUpdateTs());
+			HashMap<String, HashMap<String, TreeMap<Long, Long>>> synMsgData = inSynMsg.getDataCopy();
 			
 			if(synMsgData.isEmpty())
 				return;

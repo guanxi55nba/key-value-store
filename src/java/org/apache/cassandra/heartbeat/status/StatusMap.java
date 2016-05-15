@@ -59,6 +59,9 @@ public class StatusMap
 			// Update ts, and inform related subscription
 			keyStatus.setUpdateTs(ksName,inSrcName,inSynMsg.getTimestamp());
 			
+			// notify read handler
+			ReadHandler.notifyBySrc(ksName, inSrcName, keyStatus.getUpdateTs());
+			
 			HashMap<String, HashMap<String, TreeMap<Long, Long>>> synMsgData = inSynMsg.getDataCopy();
 			
 			if(synMsgData.isEmpty())
@@ -72,14 +75,15 @@ public class StatusMap
 				HashMap<String, TreeMap<Long, Long>> srcVnMap = keySrcVnMapEntry.getValue();
 				
 				for (Entry<String, TreeMap<Long, Long>> srcVnMapEntry : srcVnMap.entrySet()) {
-					if (srcVnMapEntry.getValue().isEmpty())
-						continue;
 
 					String src = srcVnMapEntry.getKey();
 					
+					if (src.equals(getLocalAddress())) 
+						continue;
+					
 					if (inSrcName.equals(src)) {
 						keyStatus.updateStatus(ksName, key, src, srcVnMapEntry.getValue());
-					} else if (!inSrcName.equals(getLocalAddress())) {
+					} else {
 						KeyStatus otherSrcKeyStatus = getKeyStatus(ksName, src);
 						otherSrcKeyStatus.updateStatus(ksName, key, src, srcVnMapEntry.getValue());
 					}

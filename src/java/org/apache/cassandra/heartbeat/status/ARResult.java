@@ -3,6 +3,8 @@ package org.apache.cassandra.heartbeat.status;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.cassandra.heartbeat.utils.ConfReader;
+
 /**
  * Present the result on all replica nodes
  * 
@@ -19,7 +21,7 @@ public class ARResult
     {
         m_key = inKey;
         m_blockMap = blockMap;
-        m_hasLatestValue = m_blockMap.isEmpty();
+        m_hasLatestValue = m_blockMap.size()< ConfReader.getMajorityNo();
     }
     
     public boolean value()

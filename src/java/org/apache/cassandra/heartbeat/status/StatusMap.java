@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.ReadCommand;
 import org.apache.cassandra.heartbeat.StatusSynMsg;
+import org.apache.cassandra.heartbeat.extra.HBConsts;
 import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
 import org.apache.cassandra.heartbeat.utils.ConfReader;
 import org.apache.cassandra.heartbeat.utils.HBUtils;
@@ -59,9 +60,6 @@ public class StatusMap
 			// Update ts, and inform related subscription
 			keyStatus.setUpdateTs(ksName,inSrcName,inSynMsg.getTimestamp());
 			
-			// notify read handler
-			ReadHandler.notifyBySrc(ksName, inSrcName, keyStatus.getUpdateTs());
-			
 			HashMap<String, HashMap<String, TreeMap<Long, Long>>> synMsgData = inSynMsg.getDataCopy();
 			
 			if(synMsgData.isEmpty())
@@ -77,8 +75,8 @@ public class StatusMap
 				for (Entry<String, TreeMap<Long, Long>> srcVnMapEntry : srcVnMap.entrySet()) {
 
 					String src = srcVnMapEntry.getKey();
-					
-					if (src.equals(getLocalAddress())) 
+					String localAddress = getLocalAddress();
+					if(src.contains(HBConsts.COORDINATOR)||localAddress.equals(src) || localAddress.contains(src))
 						continue;
 					
 					if (inSrcName.equals(src)) {

@@ -114,6 +114,7 @@ public class KeyStatus
     {
 		if (inUpdateTs > m_updateTs) {
 			m_updateTs = inUpdateTs;
+			ReadHandler.notifyBySrc(inKsName, inSrcName, inUpdateTs);
 		}
     }
     

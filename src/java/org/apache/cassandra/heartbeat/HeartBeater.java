@@ -43,7 +43,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterMBean {
     private static final Logger logger = LoggerFactory.getLogger(HeartBeater.class);
     private static final String MBEAN_NAME = "org.apache.cassandra.net:type=HeartBeater";
-    private static final DebuggableScheduledThreadPoolExecutor executor = new DebuggableScheduledThreadPoolExecutor(1,"HeartBeatTasks",Thread.NORM_PRIORITY);
+    private static final DebuggableScheduledThreadPoolExecutor executor = new DebuggableScheduledThreadPoolExecutor(1,"HeartBeatTasks",Thread.MAX_PRIORITY);
 //    private static final DebuggableScheduledThreadPoolExecutor executor = new DebuggableScheduledThreadPoolExecutor("HeartBeatTasks");
     public final static int intervalInMillis = ConfReader.getHeartbeatInterval();
     private final Comparator<InetAddress> inetcomparator = new Comparator<InetAddress>()

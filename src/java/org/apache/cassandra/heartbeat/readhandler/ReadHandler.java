@@ -55,7 +55,8 @@ public class ReadHandler
 		ConcurrentHashMap<String, KeySubscriptions> keyToSubs = m_subscriptionMatrics.get(ksName);
 		if (keyToSubs != null) {
 			for (Entry<String, KeySubscriptions> entry : keyToSubs.entrySet()) {
-				entry.getValue().notifySubscriptionByTs(inSrc, msgTs);
+				if(HBUtils.keyOnThisNode(ksName, entry.getKey(), inSrc))
+					entry.getValue().notifySubscriptionByTs(inSrc, msgTs);
 			}
 		}
 	}

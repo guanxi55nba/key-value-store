@@ -1,10 +1,14 @@
 package org.apache.cassandra.heartbeat.status;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 
 import org.apache.cassandra.db.ColumnFamily;
+import org.apache.cassandra.heartbeat.StatusSynMsg;
+import org.apache.cassandra.heartbeat.extra.HBConsts;
 import org.apache.cassandra.heartbeat.extra.Version;
 import org.apache.cassandra.heartbeat.readhandler.ReadHandler;
 import org.apache.cassandra.heartbeat.utils.HBUtils;
@@ -32,6 +36,39 @@ public class KeyStatus
     {
     }
     
+    
+	public void updateStatusV1(final String inSrc, StatusSynMsg inSynMsg)
+    {
+		HashMap<String, HashMap<String, TreeMap<Long, Long>>> synMsgData = inSynMsg.getDataCopy();
+        setUpdateTsV1(inSynMsg.getTimestamp());
+        String ksName = inSynMsg.getKsName();
+        if (m_updateTs > 0)
+        {
+            // Notify sinked read handler
+        	ReadHandler.notifyBySrc(ksName, inSrc, m_updateTs);
+            
+            for (Map.Entry<String, HashMap<String, TreeMap<Long, Long>>> keySrcVnMapEntry : synMsgData.entrySet())
+            {
+            	String key = keySrcVnMapEntry.getKey();
+            	
+                // Get status object and update data
+                Status status = getStatus(key);
+                
+				for (Map.Entry<String, TreeMap<Long, Long>> srcVnMapEntry : keySrcVnMapEntry.getValue().entrySet()) {
+					String src = srcVnMapEntry.getKey();
+					if (inSrc.equals(src)) {
+						status.addVnTsData(srcVnMapEntry.getValue());
+					} else if (src.contains(HBConsts.COORDINATOR)) {
+						status.addCtrlVnTs(src, srcVnMapEntry.getValue());
+					}
+				}
+				
+                // Notify sinked read handler
+                ReadHandler.notifyByTs(ksName, inSrc, keySrcVnMapEntry.getKey(), m_updateTs);
+            }
+        }
+    }
+	
 	public void updateStatus(final String ksName, final String inKey, final String inSrc, TreeMap<Long, Long> inVnTsData) {
 		// Get status object and update data
 		Status status = getStatus(inKey);
@@ -59,37 +96,20 @@ public class KeyStatus
     
     public KeyResult hasLatestValue(String key, long inReadTs)
     {
-        boolean hasLatestValue = true;
-        boolean causedByTs = false;
-        boolean causedByVn = false;
-        long version = -1;
-        Status status = m_keyStatusMap.get(key);
+		boolean hasLatestValue = true, causedByTs = false, causedByVn = false;
+		long version = -1;
+		Status status = m_keyStatusMap.get(key);
+		if(status==null)
+			return new KeyResult(hasLatestValue, causedByTs, causedByVn, version);
+		
 		if (m_updateTs <= inReadTs) {
 			hasLatestValue = false;
 			causedByTs = true;
-			//HBUtils.error("Update ts: " + HBUtils.dateFormat(m_updateTs) + ", Read Ts: " + HBUtils.dateFormat(inReadTs));
-		} else if (status != null) {
-			ConcurrentSkipListMap<Long, Long> versions = status.getVnToTsMap(); // vn: ts
-			// if doesn't exist version whose timestamp <= read ts, then this
-			// node contains the latest data
-			long previousVn = -1;
-			for (Map.Entry<Long, Long> entry : versions.entrySet()) {
-				Long localVn = entry.getKey(), timestamp = entry.getValue();
-				if (localVn >= 0) {
-					if (timestamp <= inReadTs) {
-						hasLatestValue = false;
-					} else {
-						if (!hasLatestValue && (localVn - previousVn) == 1) {
-							version = previousVn;
-							causedByVn = true;
-						}
-						break;
-					}
-					previousVn = entry.getKey();
-				}
-			}
+			// HBUtils.error("Update ts: " + HBUtils.dateFormat(m_updateTs) + // ", Read Ts: " + HBUtils.dateFormat(inReadTs));
+			return new KeyResult(hasLatestValue, causedByTs, causedByVn, version);
+		} else  {
+			return status.hasLatestValue(key, inReadTs);
 		}
-        return new KeyResult(hasLatestValue, causedByTs, causedByVn, version);
     }
     
     private Status getStatus(String key)
@@ -118,6 +138,12 @@ public class KeyStatus
 		}
     }
     
+    public void setUpdateTsV1(long inUpdateTs)
+    {
+        if (inUpdateTs > m_updateTs)
+            m_updateTs = inUpdateTs;
+    }
+    
 	public HashMap<String, Status> getKeyStatusMapCopy() {
 		return Maps.newHashMap(m_keyStatusMap);
 	}
@@ -129,5 +155,7 @@ public class KeyStatus
 	public long getUpdateTs() {
 		return m_updateTs;
 	}
+	
+    
     
 }

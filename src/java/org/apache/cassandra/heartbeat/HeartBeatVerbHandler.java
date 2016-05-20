@@ -4,7 +4,6 @@ import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.db.ConsistencyLevel;
 import org.apache.cassandra.heartbeat.status.StatusMap;
 import org.apache.cassandra.heartbeat.utils.ConfReader;
-import org.apache.cassandra.heartbeat.utils.HBUtils;
 import org.apache.cassandra.net.IVerbHandler;
 import org.apache.cassandra.net.MessageIn;
 import org.slf4j.Logger;
@@ -27,7 +26,7 @@ public class HeartBeatVerbHandler implements IVerbHandler<StatusSynMsg> {
             //String srcName = DatabaseDescriptor.getEndpointSnitch().getDatacenter(from);
             String srcName = message.from.getHostAddress();
             // Update multi dc status map
-            StatusMap.instance.updateStatusMap(srcName, message.payload);
+            StatusMap.instance.updateStatusMapV1(srcName, message.payload);
         }
     }
 

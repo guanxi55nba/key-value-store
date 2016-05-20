@@ -173,12 +173,11 @@ public class HeartBeater implements IFailureDetectionEventListener, HeartBeaterM
             {
                 String source = HBUtils.getMutationSource(cf);
                 Version vn = HBUtils.getMutationVersion(cf);
-                if (vn != null)
-                {
-                    long timestamp = vn.getTimestamp() / 1000;
-                    
-                    updateStatusMsgMap(ksName, partitionKey,source, vn.getLocalVersion(), timestamp);
-                }
+				if (vn != null) {
+					long timestamp = vn.getTimestamp() / 1000;
+					if (localSrcName.equals(source) || source.contains(HBConsts.COORDINATOR))
+						updateStatusMsgMap(ksName, partitionKey, source, vn.getLocalVersion(), timestamp);
+				}
                 else
                 {
                     logger.error("HeartBeater::updateStatusMsgMap, VersionNo is null");

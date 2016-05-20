@@ -1,7 +1,12 @@
 package org.apache.cassandra.heartbeat.status;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+
+import com.datastax.shaded.netty.util.internal.ConcurrentHashMap;
+import com.google.common.collect.Maps;
 
 /**
  * Status map structure: { vn-to-ts: { vn1: ts1, vn2: ts2 }, updateTs: ts }
@@ -11,14 +16,17 @@ import java.util.concurrent.ConcurrentSkipListMap;
  */
 public class Status
 {
-    private ConcurrentSkipListMap<Long, Long> m_currentVnToTs;
+    private ConcurrentSkipListMap<Long, Long> m_currentVnToTs = new ConcurrentSkipListMap<Long, Long>();
     private ConcurrentSkipListMap<Long, Long> m_removedVnToTs = new ConcurrentSkipListMap<Long, Long>();
+    
+	private ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> m_ctrlVnToTs = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>();
+	private ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> m_ctrlRemovedVnToTs = new ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>>();
     byte[] m_lockObj = new byte[0];
     private volatile boolean flag = true;
+    private volatile boolean ctrlFlag = true;
 
     public Status()
     {
-        m_currentVnToTs = new ConcurrentSkipListMap<Long, Long>();
     }
 
     public void addVnTsData(long inVersionNo, long inTimestamp)
@@ -49,9 +57,83 @@ public class Status
         long ts = removed ? inTs : System.currentTimeMillis();
         return ts;
     }
+    
+	public void addCtrlVnTs(String inSrc, TreeMap<Long, Long> inVnMap) {
+		if(inVnMap.isEmpty())
+			return;
+
+		ConcurrentSkipListMap<Long, Long> removedCtrlVnMap = getVnMap(m_ctrlRemovedVnToTs, inSrc);
+		ConcurrentSkipListMap<Long, Long> ctrlVnMap = getVnMap(m_ctrlVnToTs, inSrc);
+
+		for (Map.Entry<Long, Long> entry : ctrlVnMap.entrySet()) {
+			if (ctrlFlag && removedCtrlVnMap.get(entry.getKey()) != null) {
+				ctrlVnMap.put(entry.getKey(), entry.getValue());
+			}
+		}
+	}
+	
+	public long removeCtrlVnTs(String inSrc, Long inVersion, Long inTs) {
+		boolean removed;
+		ConcurrentSkipListMap<Long, Long> removedCtrlVnMap = getVnMap(m_ctrlRemovedVnToTs, inSrc);
+		removedCtrlVnMap.put(inVersion, inTs);
+		ctrlFlag = true;
+		ConcurrentSkipListMap<Long, Long> ctrlVnMap = getVnMap(m_ctrlVnToTs,inSrc);
+		removed = ctrlVnMap.remove(inVersion, inTs);
+		long ts = removed ? inTs : System.currentTimeMillis();
+		return ts;
+	}
+	
+	private ConcurrentSkipListMap<Long, Long> getVnMap(ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> inSrcVnMap, String inSrc){
+		ConcurrentSkipListMap<Long, Long> vnTsMap = inSrcVnMap.get(inSrc);
+		if (vnTsMap == null) {
+			ConcurrentSkipListMap<Long, Long> newVnTsMap = new ConcurrentSkipListMap<Long, Long>();
+			vnTsMap = inSrcVnMap.putIfAbsent(inSrc, newVnTsMap);
+			if (vnTsMap == null)
+				vnTsMap = newVnTsMap;
+		}
+		return vnTsMap;
+	}
 
     public ConcurrentSkipListMap<Long, Long> getVnToTsMap()
     {
         return m_currentVnToTs;
+    }
+    
+    public KeyResult hasLatestValue(String key, long inReadTs) {
+    	boolean hasLatestValue = true, causedByTs = false, causedByVn = false;
+        long version = -1;
+        TreeMap<Long, Long> versions = Maps.newTreeMap(m_currentVnToTs); // vn: ts
+		// if doesn't exist version whose timestamp <= read ts, then this node contains the latest data
+		long previousVn = -1;
+		for (Map.Entry<Long, Long> entry : versions.entrySet()) {
+			Long localVn = entry.getKey(), timestamp = entry.getValue();
+			if (localVn >= 0) {
+				if (timestamp <= inReadTs && inReadTs - timestamp < 512) {
+					hasLatestValue = false;
+				} else {
+					if (!hasLatestValue && (localVn - previousVn) == 1) {
+						version = previousVn;
+						causedByVn = true;
+					}
+					break;
+				}
+				previousVn = entry.getKey();
+			}
+		}
+		
+		for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> srcVnMapEntry : m_ctrlVnToTs.entrySet()) {
+			ConcurrentSkipListMap<Long, Long> vnMap = srcVnMapEntry.getValue();
+			outerloop: for (Map.Entry<Long, Long> vnMapEntry : vnMap.entrySet()) {
+				Long localVn = vnMapEntry.getKey(), timestamp = vnMapEntry.getValue();
+				if (localVn >= 0) {
+					if (timestamp <= inReadTs && inReadTs - timestamp < 512) {
+						hasLatestValue = false;
+						break outerloop;
+					}
+				}
+			}
+		}
+		
+		return new KeyResult(hasLatestValue, causedByTs, causedByVn, version);
     }
 }

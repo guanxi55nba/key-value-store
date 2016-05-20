@@ -5,6 +5,8 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
+import org.apache.cassandra.heartbeat.utils.ConfReader;
+
 import com.datastax.shaded.netty.util.internal.ConcurrentHashMap;
 import com.google.common.collect.Maps;
 
@@ -108,7 +110,7 @@ public class Status
 		for (Map.Entry<Long, Long> entry : versions.entrySet()) {
 			Long localVn = entry.getKey(), timestamp = entry.getValue();
 			if (localVn >= 0) {
-				if (timestamp <= inReadTs && inReadTs - timestamp < 512) {
+				if (timestamp <= inReadTs && (inReadTs - timestamp) < ConfReader.getTimeout()) {
 					hasLatestValue = false;
 				} else {
 					if (!hasLatestValue && (localVn - previousVn) == 1) {
@@ -126,7 +128,7 @@ public class Status
 			outerloop: for (Map.Entry<Long, Long> vnMapEntry : vnMap.entrySet()) {
 				Long localVn = vnMapEntry.getKey(), timestamp = vnMapEntry.getValue();
 				if (localVn >= 0) {
-					if (timestamp <= inReadTs && inReadTs - timestamp < 512) {
+					if (timestamp <= inReadTs && (inReadTs - timestamp) < ConfReader.getTimeout()) {
 						hasLatestValue = false;
 						break outerloop;
 					}

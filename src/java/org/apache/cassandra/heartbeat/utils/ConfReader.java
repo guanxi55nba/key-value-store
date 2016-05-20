@@ -8,6 +8,7 @@ import java.util.Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public class ConfReader
 {
     private static final Logger logger = LoggerFactory.getLogger(ConfReader.class);
@@ -19,6 +20,7 @@ public class ConfReader
     public int heartbeatInternval = 10;
     public boolean quorumEnabled = false;
     public int majorityNo = 2;
+    public int timeout = 1000;
     private static final ConfReader instance = new ConfReader();
     private static final String USER_DIR = "user.dir";
     private static final String PARENT_FOLDER = "conf";
@@ -42,6 +44,7 @@ public class ConfReader
             heartbeatInternval = Integer.valueOf(configuration.getProperty("heartbeat.interval"));
             quorumEnabled = Boolean.valueOf(configuration.getProperty("enable.write-read-local-quorum"));
             majorityNo = Integer.valueOf(configuration.getProperty("majority.no"));
+            timeout = Integer.valueOf(configuration.getProperty("timeout"));
         }
         catch (IOException e)
         {
@@ -72,5 +75,9 @@ public class ConfReader
     
 	public static int getMajorityNo() {
 		return instance.majorityNo;
+	}
+	
+	public static int getTimeout() {
+		return instance.timeout;
 	}
 }

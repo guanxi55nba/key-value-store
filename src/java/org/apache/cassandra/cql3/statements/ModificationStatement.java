@@ -661,12 +661,9 @@ public abstract class ModificationStatement implements CQLStatement
             if (ConfReader.heartbeatEnable())
             {
                 String ksName = cf.metadata().ksName;
-                long vn = -1;
-                boolean isReplicaNode = HBUtils.isReplicaNode(ksName, key);
                 String srcName = HBUtils.getLocalAddress().getHostAddress();
-                if (isReplicaNode){
-                    vn = HeartBeater.instance.getKeyVersionNo(ksName, key);
-                }else{
+                long vn  = HeartBeater.instance.getKeyVersionNo(ksName, key);
+                if (!HBUtils.isReplicaNode(ksName, key)){
                     srcName = srcName+ HBConsts.COORDINATOR;
                 }
                 HBUtils.addVnAndSourceInUpdate(params, clusteringPrefix, cf, vn, srcName);

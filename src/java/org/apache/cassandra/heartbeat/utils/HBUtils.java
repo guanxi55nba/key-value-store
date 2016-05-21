@@ -375,6 +375,16 @@ public class HBUtils
 		return getReplicaList(inKeySpaceName, key, false).contains(getLocalAddress());
 	}
 	
+	public static boolean isReplicaNode(String inKeySpaceName, ByteBuffer key, String src) {
+		List<InetAddress> addresses = getReplicaList(inKeySpaceName, key, false);
+		for (InetAddress inetAddress : addresses) {
+			if (inetAddress.getHostAddress().equals(src)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
     public static boolean isValidRead(ReadCommand cmd)
     {
         return cmd != null && isValidKsName(cmd.ksName)

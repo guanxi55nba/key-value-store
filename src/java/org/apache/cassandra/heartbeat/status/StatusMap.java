@@ -68,19 +68,42 @@ public class StatusMap
      */
     public void removeEntry(String inSrcName, final Mutation inMutation)
     {
-        if (inSrcName != null && inMutation != null)
-        {
-            String ksName = inMutation.getKeyspaceName();
-            if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName))
-            {
-                KeyStatus keyStatus = getKeyStatus(ksName, inSrcName);
-                keyStatus.removeEntry(inSrcName, ksName, inMutation.getColumnFamilies());
-            }
-        }
-        else
-        {
-            logger.debug("removeEntry method: inSrcName or inMutation is null");
-        }
+    	try {
+    		if (inSrcName != null && inMutation != null)
+    		{
+    			String ksName = inMutation.getKeyspaceName();
+    			if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName))
+    			{
+    				boolean isController = HBUtils.isReplicaNode(ksName, inMutation.key(), inSrcName);
+    				if (isController) {
+    					ConcurrentHashMap<String, KeyStatus> srcToKeyStatus = m_currentEntries.get(ksName);
+    					if (srcToKeyStatus == null)
+    					{
+    						ConcurrentHashMap<String, KeyStatus> temp1 = new ConcurrentHashMap<String, KeyStatus>(3,1,32);
+    						srcToKeyStatus = m_currentEntries.putIfAbsent(ksName, temp1);
+    						if (srcToKeyStatus == null)
+    							srcToKeyStatus = temp1;
+    					}
+    					for (Entry<String, KeyStatus> srcKeyMapEntry : srcToKeyStatus.entrySet()) {
+    						String replicaSrc = srcKeyMapEntry.getKey();
+    						KeyStatus keyStatus = srcKeyMapEntry.getValue();
+    						keyStatus.removeCtrlEntry(replicaSrc, ksName, inMutation.getColumnFamilies(), inSrcName);
+    					}
+    					
+    				} else {
+    					KeyStatus keyStatus = getKeyStatus(ksName, inSrcName);
+    					keyStatus.removeEntry(inSrcName, ksName, inMutation.getColumnFamilies());
+    				}
+    			}
+    		}
+    		else
+    		{
+    			logger.debug("removeEntry method: inSrcName or inMutation is null");
+    		}
+			
+		} catch (Exception e) {
+			logger.info("removeEntry", e);;
+		}
     }
     
     /**

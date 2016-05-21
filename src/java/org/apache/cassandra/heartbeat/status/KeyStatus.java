@@ -93,6 +93,22 @@ public class KeyStatus
 			}
 		}
 	}
+	
+	public void removeCtrlEntry(final String inSrc, final String ksName, final Collection<ColumnFamily> CFS, String inCtrlSrc) {
+		for (ColumnFamily cf : CFS) {
+			Version version = HBUtils.getMutationVersion(cf);
+			if (version != null) {
+				String key = HBUtils.getPrimaryKeyName(cf.metadata());
+				Status status = getStatus(key);
+				status.removeCtrlVnTs(inCtrlSrc, version.getLocalVersion(), version.getTimestamp());
+				ReadHandler.notifyByTs(ksName, inSrc, key, System.currentTimeMillis());
+			} else {
+				HBUtils.error("KeyStatus::updateStatus, version value is null, ColumnFamily: {}", cf.toString());
+			}
+		}
+	}
+	
+	
     
     public KeyResult hasLatestValue(String key, long inReadTs)
     {

@@ -64,6 +64,10 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
             
             message.payload.apply();
             
+            WriteResponse response = new WriteResponse();
+            Tracing.trace("Enqueuing response to {}", replyTo);
+            MessagingService.instance().sendReply(response.createMessage(), id, replyTo);
+            
             if (ConfReader.heartbeatEnable())
             {
                 if (message.payload != null)
@@ -76,9 +80,6 @@ public class MutationVerbHandler implements IVerbHandler<Mutation>
                     logger.error("MutationVerbHandler::doVerb, mutation is null");
                 }
             }
-            WriteResponse response = new WriteResponse();
-            Tracing.trace("Enqueuing response to {}", replyTo);
-            MessagingService.instance().sendReply(response.createMessage(), id, replyTo);
         }
         catch (IOException e)
         {

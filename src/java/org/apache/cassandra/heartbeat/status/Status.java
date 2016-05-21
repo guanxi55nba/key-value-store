@@ -1,13 +1,12 @@
 package org.apache.cassandra.heartbeat.status;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 import org.apache.cassandra.heartbeat.utils.ConfReader;
 
-import com.datastax.shaded.netty.util.internal.ConcurrentHashMap;
 import com.google.common.collect.Maps;
 
 /**
@@ -74,12 +73,12 @@ public class Status
 		}
 	}
 	
-	public long removeCtrlVnTs(String inSrc, Long inVersion, Long inTs) {
+	public long removeCtrlVnTs(String inCtrlSrc, Long inVersion, Long inTs) {
 		boolean removed;
-		ConcurrentSkipListMap<Long, Long> removedCtrlVnMap = getVnMap(m_ctrlRemovedVnToTs, inSrc);
+		ConcurrentSkipListMap<Long, Long> removedCtrlVnMap = getVnMap(m_ctrlRemovedVnToTs, inCtrlSrc);
 		removedCtrlVnMap.put(inVersion, inTs);
 		ctrlFlag = true;
-		ConcurrentSkipListMap<Long, Long> ctrlVnMap = getVnMap(m_ctrlVnToTs,inSrc);
+		ConcurrentSkipListMap<Long, Long> ctrlVnMap = getVnMap(m_ctrlVnToTs,inCtrlSrc);
 		removed = ctrlVnMap.remove(inVersion, inTs);
 		long ts = removed ? inTs : System.currentTimeMillis();
 		return ts;

@@ -69,15 +69,6 @@ public class KeyStatus
         }
     }
 	
-	public void updateStatus(final String ksName, final String inKey, final String inSrc, TreeMap<Long, Long> inVnTsData) {
-		// Get status object and update data
-		Status status = getStatus(inKey);
-		status.addVnTsData(inVnTsData);
-
-		// Notify sinked read handler
-		ReadHandler.notifyByTs(ksName, inSrc, inKey, m_updateTs);
-	}
-    
 	public void removeEntry(final String inSrc, final String ksName, final Collection<ColumnFamily> CFS) {
 		for (ColumnFamily cf : CFS) {
 			Version version = HBUtils.getMutationVersion(cf);
@@ -115,17 +106,16 @@ public class KeyStatus
 		boolean hasLatestValue = true, causedByTs = false, causedByVn = false;
 		long version = -1;
 		Status status = m_keyStatusMap.get(key);
-		if(status==null)
-			return new KeyResult(hasLatestValue, causedByTs, causedByVn, version);
 		
 		if (m_updateTs <= inReadTs) {
 			hasLatestValue = false;
 			causedByTs = true;
-			// HBUtils.error("Update ts: " + HBUtils.dateFormat(m_updateTs) + // ", Read Ts: " + HBUtils.dateFormat(inReadTs));
+			// HBUtils.error("Update ts: " + HBUtils.dateFormat(m_updateTs) + ", Read Ts: " + HBUtils.dateFormat(inReadTs));
 			return new KeyResult(hasLatestValue, causedByTs, causedByVn, version);
-		} else  {
+		} else if (status != null) {
 			return status.hasLatestValue(key, inReadTs);
 		}
+		return new KeyResult(hasLatestValue, causedByTs, causedByVn, version);
     }
     
     private Status getStatus(String key)
@@ -146,13 +136,13 @@ public class KeyStatus
         return m_keyStatusMap.values().size();
     }
     
-    public void setUpdateTs(String inKsName, String inSrcName, long inUpdateTs)
-    {
-		if (inUpdateTs > m_updateTs) {
-			m_updateTs = inUpdateTs;
-			ReadHandler.notifyBySrc(inKsName, inSrcName, inUpdateTs);
-		}
-    }
+//    public void setUpdateTs(String inKsName, String inSrcName, long inUpdateTs)
+//    {
+//		if (inUpdateTs > m_updateTs) {
+//			m_updateTs = inUpdateTs;
+//			ReadHandler.notifyBySrc(inKsName, inSrcName, inUpdateTs);
+//		}
+//    }
     
     public void setUpdateTsV1(long inUpdateTs)
     {
@@ -171,6 +161,15 @@ public class KeyStatus
 	public long getUpdateTs() {
 		return m_updateTs;
 	}
+	
+//	public void updateStatus(final String ksName, final String inKey, final String inSrc, TreeMap<Long, Long> inVnTsData) {
+//		// Get status object and update data
+//		Status status = getStatus(inKey);
+//		status.addVnTsData(inVnTsData);
+//
+//		// Notify sinked read handler
+//		ReadHandler.notifyByTs(ksName, inSrc, inKey, m_updateTs);
+//	}
 	
     
     

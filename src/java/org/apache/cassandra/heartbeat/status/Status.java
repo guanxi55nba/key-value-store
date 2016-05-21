@@ -122,9 +122,9 @@ public class Status
 			}
 		}
 		
-		for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> srcVnMapEntry : m_ctrlVnToTs.entrySet()) {
+		outerloop: for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> srcVnMapEntry : m_ctrlVnToTs.entrySet()) {
 			ConcurrentSkipListMap<Long, Long> vnMap = srcVnMapEntry.getValue();
-			outerloop: for (Map.Entry<Long, Long> vnMapEntry : vnMap.entrySet()) {
+			for (Map.Entry<Long, Long> vnMapEntry : vnMap.entrySet()) {
 				Long localVn = vnMapEntry.getKey(), timestamp = vnMapEntry.getValue();
 				if (localVn >= 0) {
 					if (timestamp <= inReadTs && (inReadTs - timestamp) < ConfReader.getTimeout()) {

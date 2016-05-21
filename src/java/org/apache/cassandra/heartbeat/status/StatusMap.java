@@ -74,7 +74,7 @@ public class StatusMap
     			String ksName = inMutation.getKeyspaceName();
     			if (!HBUtils.SYSTEM_KEYSPACES.contains(ksName))
     			{
-    				boolean isController = HBUtils.isReplicaNode(ksName, inMutation.key(), inSrcName);
+    				boolean isController = !HBUtils.isReplicaNode(ksName, inMutation.key(), inSrcName);
     				if (isController) {
     					ConcurrentHashMap<String, KeyStatus> srcToKeyStatus = m_currentEntries.get(ksName);
     					if (srcToKeyStatus == null)
@@ -237,49 +237,49 @@ public class StatusMap
      * @param inSrcName
      * @param inSynMsg
      */
-	public void updateStatusMap(final String inSrcName, final StatusSynMsg inSynMsg) {
-		if(ConfReader.isLogEnabled())
-			logger.info("Receive status msg to {} from {}", inSynMsg, inSrcName);
-		
-		if (inSynMsg != null) {
-			String ksName = inSynMsg.getKsName();
-			KeyStatus keyStatus = getKeyStatus(ksName, inSrcName);
-			if (inSynMsg.getTimestamp() <= 0)
-				return;
-
-			// Update ts, and inform related subscription
-			keyStatus.setUpdateTs(ksName,inSrcName,inSynMsg.getTimestamp());
-			
-			HashMap<String, HashMap<String, TreeMap<Long, Long>>> synMsgData = inSynMsg.getDataCopy();
-			
-			if(synMsgData.isEmpty())
-				return;
-			
-			for (Entry<String, HashMap<String, TreeMap<Long, Long>>> keySrcVnMapEntry : synMsgData.entrySet()) {
-				if (keySrcVnMapEntry.getValue().isEmpty())
-					continue;
-
-				String key = keySrcVnMapEntry.getKey();
-				HashMap<String, TreeMap<Long, Long>> srcVnMap = keySrcVnMapEntry.getValue();
-				
-				for (Entry<String, TreeMap<Long, Long>> srcVnMapEntry : srcVnMap.entrySet()) {
-
-					String src = srcVnMapEntry.getKey();
-					String localAddress = getLocalAddress();
-					if(src.contains(HBConsts.COORDINATOR)||localAddress.equals(src) || localAddress.contains(src))
-						continue;
-					
-					if (inSrcName.equals(src)) {
-						keyStatus.updateStatus(ksName, key, src, srcVnMapEntry.getValue());
-					} else {
-						KeyStatus otherSrcKeyStatus = getKeyStatus(ksName, src);
-						otherSrcKeyStatus.updateStatus(ksName, key, src, srcVnMapEntry.getValue());
-					}
-				}
-			}
-		} else {
-			HBUtils.error("inSynMsg is null");
-		}
-	}
+//	public void updateStatusMap(final String inSrcName, final StatusSynMsg inSynMsg) {
+//		if(ConfReader.isLogEnabled())
+//			logger.info("Receive status msg to {} from {}", inSynMsg, inSrcName);
+//		
+//		if (inSynMsg != null) {
+//			String ksName = inSynMsg.getKsName();
+//			KeyStatus keyStatus = getKeyStatus(ksName, inSrcName);
+//			if (inSynMsg.getTimestamp() <= 0)
+//				return;
+//
+//			// Update ts, and inform related subscription
+//			keyStatus.setUpdateTs(ksName,inSrcName,inSynMsg.getTimestamp());
+//			
+//			HashMap<String, HashMap<String, TreeMap<Long, Long>>> synMsgData = inSynMsg.getDataCopy();
+//			
+//			if(synMsgData.isEmpty())
+//				return;
+//			
+//			for (Entry<String, HashMap<String, TreeMap<Long, Long>>> keySrcVnMapEntry : synMsgData.entrySet()) {
+//				if (keySrcVnMapEntry.getValue().isEmpty())
+//					continue;
+//
+//				String key = keySrcVnMapEntry.getKey();
+//				HashMap<String, TreeMap<Long, Long>> srcVnMap = keySrcVnMapEntry.getValue();
+//				
+//				for (Entry<String, TreeMap<Long, Long>> srcVnMapEntry : srcVnMap.entrySet()) {
+//
+//					String src = srcVnMapEntry.getKey();
+//					String localAddress = getLocalAddress();
+//					if(src.contains(HBConsts.COORDINATOR)||localAddress.equals(src) || localAddress.contains(src))
+//						continue;
+//					
+//					if (inSrcName.equals(src)) {
+//						keyStatus.updateStatus(ksName, key, src, srcVnMapEntry.getValue());
+//					} else {
+//						KeyStatus otherSrcKeyStatus = getKeyStatus(ksName, src);
+//						otherSrcKeyStatus.updateStatus(ksName, key, src, srcVnMapEntry.getValue());
+//					}
+//				}
+//			}
+//		} else {
+//			HBUtils.error("inSynMsg is null");
+//		}
+//	}
 
 }

@@ -7,7 +7,6 @@ import java.util.concurrent.ConcurrentSkipListMap;
 
 import org.apache.cassandra.heartbeat.utils.ConfReader;
 
-import com.google.common.collect.Maps;
 
 /**
  * Status map structure: { vn-to-ts: { vn1: ts1, vn2: ts2 }, updateTs: ts }
@@ -100,17 +99,18 @@ public class Status
         return m_currentVnToTs;
     }
     
-    public KeyResult hasLatestValue(String key, long inReadTs) {
+    public KeyResult hasLatestValue(final String key, final long inReadTs) {
     	boolean hasLatestValue = true, causedByTs = false, causedByVn = false;
         long version = -1;
-        TreeMap<Long, Long> versions = Maps.newTreeMap(m_currentVnToTs); // vn: ts
+        // TreeMap<Long, Long> versions = Maps.newTreeMap(m_currentVnToTs); // vn: ts
 		// if doesn't exist version whose timestamp <= read ts, then this node contains the latest data
 		long previousVn = -1;
-		for (Map.Entry<Long, Long> entry : versions.entrySet()) {
+		for (Map.Entry<Long, Long> entry : m_currentVnToTs.entrySet()) {
 			Long localVn = entry.getKey(), timestamp = entry.getValue();
 			if (localVn >= 0) {
-				if (timestamp <= inReadTs && (inReadTs - timestamp) < ConfReader.getTimeout()) {
-					hasLatestValue = false;
+				if (timestamp <= inReadTs ){
+					if((inReadTs - timestamp) < ConfReader.getTimeout())
+						hasLatestValue = false;
 				} else {
 					if (!hasLatestValue && (localVn - previousVn) == 1) {
 						version = previousVn;
@@ -118,23 +118,28 @@ public class Status
 					}
 					break;
 				}
-				previousVn = entry.getKey();
+				previousVn = localVn;
 			}
 		}
-		
-		outerloop: for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> srcVnMapEntry : m_ctrlVnToTs.entrySet()) {
-			ConcurrentSkipListMap<Long, Long> vnMap = srcVnMapEntry.getValue();
-			for (Map.Entry<Long, Long> vnMapEntry : vnMap.entrySet()) {
-				Long localVn = vnMapEntry.getKey(), timestamp = vnMapEntry.getValue();
-				if (localVn >= 0) {
-					if (timestamp <= inReadTs && (inReadTs - timestamp) < ConfReader.getTimeout()) {
-						hasLatestValue = false;
-						break outerloop;
+		if(hasLatestValue) {
+			outerloop: for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> srcVnMapEntry : m_ctrlVnToTs.entrySet()) {
+				ConcurrentSkipListMap<Long, Long> vnMap = srcVnMapEntry.getValue();
+				for (Map.Entry<Long, Long> vnMapEntry : vnMap.entrySet()) {
+					Long localVn = vnMapEntry.getKey(), timestamp = vnMapEntry.getValue();
+					if (localVn >= 0) {
+						if (timestamp <= inReadTs ) {
+							if((inReadTs - timestamp) < ConfReader.getTimeout()) {
+								hasLatestValue = false;
+								break outerloop;
+							}
+						}else {
+							// has latest value
+							break outerloop;
+						}
 					}
 				}
 			}
 		}
-		
 		return new KeyResult(hasLatestValue, causedByTs, causedByVn, version);
     }
 }
